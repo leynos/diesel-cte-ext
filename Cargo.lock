@@ -1799,6 +1799,8 @@ dependencies = [
 [[package]]
 name = "pg-embed-setup-unpriv"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bba1b35a63b75cad7cb4772af557db5c50a138ea84ade584ddd47cc241d65008"
 dependencies = [
  "camino",
  "cap-std",
