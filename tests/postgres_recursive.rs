@@ -2,7 +2,7 @@
 //! Behavioural tests for recursive CTE helpers on `PostgreSQL`.
 
 use diesel::RunQueryDsl as DieselRunQueryDsl;
-use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer};
+use diesel::{dsl::sql, sql_types::Integer};
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
@@ -46,7 +46,7 @@ fn recursive_sequence_via_sync_conn(
     let mut conn = cluster.connection().diesel_connection("postgres")?;
 
     let rows: Vec<i32> = DieselRunQueryDsl::load(
-        PgConnection::with_recursive(
+        conn.with_recursive(
             "t",
             &["n"],
             RecursiveParts::new(
@@ -85,7 +85,7 @@ fn recursive_sequence_via_async_conn(
         let mut conn = AsyncPgConnection::establish(&db_url).await?;
 
         let rows: Vec<i32> = AsyncRunQueryDsl::load(
-            AsyncPgConnection::with_recursive(
+            conn.with_recursive(
                 "t",
                 &["n"],
                 RecursiveParts::new(
@@ -117,7 +117,7 @@ fn non_recursive_cte_returns_seed(
     let mut conn = cluster.connection().diesel_connection("postgres")?;
 
     let result: i32 = DieselRunQueryDsl::get_result(
-        PgConnection::with_cte(
+        conn.with_cte(
             "seed",
             &["value"],
             sql::<Integer>("SELECT 42"),

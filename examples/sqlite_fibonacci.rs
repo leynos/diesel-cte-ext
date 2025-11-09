@@ -16,16 +16,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// length deviates from the expected ten rows.
 pub fn run_fibonacci_example() -> Result<Vec<i32>, Box<dyn std::error::Error>> {
     let mut conn = SqliteConnection::establish(":memory:")?;
-    let values: Vec<i32> = SqliteConnection::with_recursive(
-        "series",
-        &["n"],
-        RecursiveParts::new(
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
-            sql::<Integer>("SELECT n FROM series"),
-        ),
-    )
-    .load(&mut conn)?;
+    let values: Vec<i32> = conn
+        .with_recursive(
+            "series",
+            &["n"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
+                sql::<Integer>("SELECT n FROM series"),
+            ),
+        )
+        .load(&mut conn)?;
 
     if values.len() != 10 {
         return Err("expected ten rows in the series".into());

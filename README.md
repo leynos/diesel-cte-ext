@@ -35,7 +35,7 @@ use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
 fn five_high(mut conn: PgConnection) -> diesel::QueryResult<Vec<i32>> {
-    PgConnection::with_recursive(
+    conn.with_recursive(
         "series",
         &["n"],
         RecursiveParts::new(

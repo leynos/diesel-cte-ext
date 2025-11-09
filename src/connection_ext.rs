@@ -29,6 +29,7 @@ pub trait RecursiveCTEExt {
     /// See [`builders::with_recursive`] for parameter details.
     #[doc(alias = "builders::with_recursive")]
     fn with_recursive<Cols, Seed, Step, Body, ColSpec>(
+        &self,
         cte_name: &'static str,
         columns: ColSpec,
         parts: RecursiveParts<Seed, Step, Body>,
@@ -43,7 +44,12 @@ pub trait RecursiveCTEExt {
     }
 
     /// Create a [`WithCte`] builder for this connection's backend.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "API mirrors Diesel's with_cte builder signature"
+    )]
     fn with_cte<Cols, Cte, Body, ColSpec>(
+        &self,
         cte_name: &'static str,
         columns: ColSpec,
         cte: Cte,
@@ -90,24 +96,26 @@ mod tests {
     use super::*;
     use crate::{builders::RecursiveParts, test_support::normalise_debug_sql};
     use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
+    use std::marker::PhantomData;
 
     #[cfg(feature = "sqlite")]
     #[test]
-    fn sqlite_connection_exposes_with_recursive() {
+    fn sqlite_backend_builds_recursive_sql() {
         use diesel::sqlite::Sqlite;
 
-        let query =
-            diesel::sqlite::SqliteConnection::with_recursive("nums", &["n"], sample_parts());
+        let conn = DummyConn::<Sqlite>::default();
+        let query = conn.with_recursive("nums", &["n"], sample_parts());
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(sql, expected_recursive_sql());
     }
 
     #[cfg(feature = "sqlite")]
     #[test]
-    fn sqlite_connection_exposes_with_cte() {
+    fn sqlite_backend_builds_cte_sql() {
         use diesel::sqlite::Sqlite;
 
-        let query = diesel::sqlite::SqliteConnection::with_cte(
+        let conn = DummyConn::<Sqlite>::default();
+        let query = conn.with_cte(
             "seed",
             &["value"],
             sql::<Integer>("SELECT 42"),
@@ -122,41 +130,40 @@ mod tests {
 
     #[cfg(feature = "postgres")]
     #[test]
-    fn postgres_connection_exposes_with_recursive() {
+    fn postgres_backend_builds_recursive_sql() {
         use diesel::pg::Pg;
 
-        let query = diesel::pg::PgConnection::with_recursive("nums", &["n"], sample_parts());
+        let conn = DummyConn::<Pg>::default();
+        let query = conn.with_recursive("nums", &["n"], sample_parts());
         let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
         assert_eq!(sql, expected_recursive_sql());
     }
 
-    #[cfg(all(feature = "async", feature = "postgres"))]
     #[test]
-    fn async_postgres_connection_exposes_with_recursive() {
-        use diesel::pg::Pg;
-        use diesel_async::AsyncPgConnection;
+    fn connection_types_implement_recursive_ext() {
+        fn assert_impl<T: RecursiveCTEExt>() {}
 
-        let query = AsyncPgConnection::with_recursive("nums", &["n"], sample_parts());
-        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql());
+        #[cfg(feature = "sqlite")]
+        {
+            assert_impl::<diesel::sqlite::SqliteConnection>();
+            #[cfg(feature = "async")]
+            assert_impl::<
+                diesel_async::sync_connection_wrapper::SyncConnectionWrapper<
+                    diesel::sqlite::SqliteConnection,
+                >,
+            >();
+        }
+
+        #[cfg(feature = "postgres")]
+        {
+            assert_impl::<diesel::pg::PgConnection>();
+            #[cfg(feature = "async")]
+            assert_impl::<diesel_async::AsyncPgConnection>();
+        }
     }
 
-    #[cfg(all(feature = "async", feature = "sqlite"))]
-    #[test]
-    fn async_sqlite_wrapper_exposes_with_recursive() {
-        use diesel::sqlite::Sqlite;
-        use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
-
-        let query = SyncConnectionWrapper::<diesel::sqlite::SqliteConnection>::with_recursive(
-            "nums",
-            &["n"],
-            sample_parts(),
-        );
-        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql());
-    }
-
-    fn sample_parts() -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
+    fn sample_parts()
+    -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
         RecursiveParts::new(
             sql::<Integer>("SELECT 1"),
             sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 5"),
@@ -166,5 +173,15 @@ mod tests {
 
     fn expected_recursive_sql() -> &'static str {
         "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
+    }
+
+    #[derive(Default)]
+    struct DummyConn<DB>(PhantomData<DB>);
+
+    impl<DB> RecursiveCTEExt for DummyConn<DB>
+    where
+        DB: RecursiveBackend,
+    {
+        type Backend = DB;
     }
 }

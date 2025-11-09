@@ -16,13 +16,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// from the expected fixtures.
 pub fn run_directory_example() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut conn = SqliteConnection::establish(":memory:")?;
-    let names: Vec<String> = SqliteConnection::with_cte(
-        "seed",
-        &["message"],
-        sql::<Text>("SELECT 'Hello' AS message UNION ALL SELECT 'Diesel'"),
-        sql::<Text>("SELECT message FROM seed ORDER BY message DESC"),
-    )
-    .load(&mut conn)?;
+    let names: Vec<String> = conn
+        .with_cte(
+            "seed",
+            &["message"],
+            sql::<Text>("SELECT 'Hello' AS message UNION ALL SELECT 'Diesel'"),
+            sql::<Text>("SELECT message FROM seed ORDER BY message DESC"),
+        )
+        .load(&mut conn)?;
 
     let expected = vec!["Hello".to_owned(), "Diesel".to_owned()];
     if names != expected {

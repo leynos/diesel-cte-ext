@@ -41,7 +41,7 @@ use diesel_cte_ext::RecursiveCTEExt;
 
 fn names() -> diesel::QueryResult<Vec<String>> {
     let mut conn = SqliteConnection::establish(":memory:")?;
-    SqliteConnection::with_cte(
+    conn.with_cte(
         "names",
         &["label"],
         sql::<Text>("SELECT 'root' AS label UNION ALL SELECT 'child'"),
@@ -62,7 +62,7 @@ use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
 fn up_to_five(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
-    PgConnection::with_recursive(
+    conn.with_recursive(
         "series",
         &["n"],
         RecursiveParts::new(
@@ -84,7 +84,7 @@ use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
 async fn up_to_five_async() -> diesel::QueryResult<Vec<i32>> {
     let mut conn = AsyncPgConnection::establish("postgresql://localhost/postgres").await?;
-    AsyncPgConnection::with_recursive(
+    conn.with_recursive(
         "series",
         &["n"],
         RecursiveParts::new(
