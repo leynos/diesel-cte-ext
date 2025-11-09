@@ -122,6 +122,24 @@ const MANAGER_COLUMNS: Columns<(employees::id, employees::manager_id)> =
 const FULL_TABLE: Columns<employees::table> = table_columns!(employees::table);
 ```
 
+## Macro helpers for inline fragments
+
+Use `cte_query!`, `seed_query!`, and `step_query!` to wrap ad-hoc Diesel
+expressions before passing them into `RecursiveParts::new`. The macros keep the
+fragments strongly typed whilst avoiding manual `QueryPart` construction and
+make the exported helpers more visible if you are scanning the module surface.
+
+```rust,no_run
+use diesel::{dsl::sql, sql_types::Integer};
+use diesel_cte_ext::{RecursiveParts, cte_query, seed_query, step_query};
+
+let parts = RecursiveParts::new(
+    seed_query!(sql::<Integer>("SELECT 1")),
+    step_query!(sql::<Integer>("SELECT n + 1 FROM series")),
+    cte_query!(sql::<Integer>("SELECT n FROM series")),
+);
+```
+
 ## Testing with `pg_embedded_setup_unpriv`
 
 The integration tests under `tests/` rely on

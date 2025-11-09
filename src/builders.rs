@@ -74,3 +74,43 @@ where
         _marker: std::marker::PhantomData,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::normalise_debug_sql;
+    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+
+    #[test]
+    fn recursive_builder_composes_fragments() {
+        let query = with_recursive::<Sqlite, _, _, _, _, _>(
+            "nums",
+            &["n"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>("SELECT n + 1 FROM nums"),
+                sql::<Integer>("SELECT n FROM nums"),
+            ),
+        );
+        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums) SELECT n FROM nums"
+        );
+    }
+
+    #[test]
+    fn non_recursive_builder_composes_fragments() {
+        let query = with_cte::<Sqlite, _, _, _, _>(
+            "nums",
+            &["n"],
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n FROM nums"),
+        );
+        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH \"nums\" (\"n\") AS (SELECT 1) SELECT n FROM nums"
+        );
+    }
+}

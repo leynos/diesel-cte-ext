@@ -48,6 +48,20 @@ fn five_high(mut conn: PgConnection) -> diesel::QueryResult<Vec<i32>> {
 }
 ```
 
+Wrap Diesel expressions for the seed, step, or body fragments using the macro
+helpers when you need to inline SQL snippets:
+
+```rust,no_run
+use diesel::{dsl::sql, sql_types::Integer};
+use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts, cte_query, seed_query, step_query};
+
+let parts = RecursiveParts::new(
+    seed_query!(sql::<Integer>("SELECT 1")),
+    step_query!(sql::<Integer>("SELECT n + 1 FROM series")),
+    cte_query!(sql::<Integer>("SELECT n FROM series")),
+);
+```
+
 See `docs/users-guide.md` for a fuller tour, including trait diagrams and
 advanced builder patterns.
 

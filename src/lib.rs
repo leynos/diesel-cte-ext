@@ -9,6 +9,8 @@ pub mod columns;
 pub mod connection_ext;
 pub mod cte;
 pub mod macros;
+#[cfg(test)]
+pub(crate) mod test_support;
 
 /// Bundles the seed, step, and body fragments handed to `with_recursive`.
 pub use builders::RecursiveParts;

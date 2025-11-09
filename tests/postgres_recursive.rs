@@ -12,7 +12,7 @@ use rstest::{fixture, rstest};
 type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 fn configure_pg_embed_env() {
-    use std::{env, fs, path::PathBuf, sync::Once};
+    use std::{fs, path::PathBuf, sync::Once};
 
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -26,8 +26,8 @@ fn configure_pg_embed_env() {
             panic!("data directory: {err}");
         }
         unsafe {
-            env::set_var("PG_RUNTIME_DIR", runtime);
-            env::set_var("PG_DATA_DIR", data);
+            std::env::set_var("PG_RUNTIME_DIR", runtime);
+            std::env::set_var("PG_DATA_DIR", data);
         }
     });
 }

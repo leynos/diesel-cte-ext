@@ -127,3 +127,73 @@ macro_rules! table_columns {
         $crate::columns::Columns::for_table::<$table>()
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{columns, table_columns};
+
+    diesel::table! {
+        sample (id) {
+            id -> diesel::sql_types::Integer,
+            value -> diesel::sql_types::Text,
+        }
+    }
+
+    diesel::table! {
+        wide (c01) {
+            c01 -> diesel::sql_types::Integer,
+            c02 -> diesel::sql_types::Integer,
+            c03 -> diesel::sql_types::Integer,
+            c04 -> diesel::sql_types::Integer,
+            c05 -> diesel::sql_types::Integer,
+            c06 -> diesel::sql_types::Integer,
+            c07 -> diesel::sql_types::Integer,
+            c08 -> diesel::sql_types::Integer,
+            c09 -> diesel::sql_types::Integer,
+            c10 -> diesel::sql_types::Integer,
+            c11 -> diesel::sql_types::Integer,
+            c12 -> diesel::sql_types::Integer,
+            c13 -> diesel::sql_types::Integer,
+            c14 -> diesel::sql_types::Integer,
+            c15 -> diesel::sql_types::Integer,
+            c16 -> diesel::sql_types::Integer,
+        }
+    }
+
+    #[test]
+    fn raw_columns_exposes_names() {
+        let cols = Columns::<()>::raw(&["a", "b"]);
+        assert_eq!(cols.names, &["a", "b"]);
+    }
+
+    #[test]
+    fn for_table_uses_table_definition() {
+        let cols = Columns::for_table::<sample::table>();
+        assert_eq!(cols.names, &["id", "value"]);
+    }
+
+    #[test]
+    fn columns_macro_matches_manual_names() {
+        let cols = columns!(sample::id, sample::value);
+        assert_eq!(cols.names, &["id", "value"]);
+    }
+
+    #[test]
+    fn table_columns_macro_matches_manual_names() {
+        let cols = table_columns!(sample::table);
+        assert_eq!(cols.names, &["id", "value"]);
+    }
+
+    #[test]
+    fn for_table_supports_sixteen_columns() {
+        let cols = Columns::for_table::<wide::table>();
+        assert_eq!(
+            cols.names,
+            &[
+                "c01", "c02", "c03", "c04", "c05", "c06", "c07", "c08", "c09", "c10", "c11", "c12",
+                "c13", "c14", "c15", "c16",
+            ]
+        );
+    }
+}

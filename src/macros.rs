@@ -80,3 +80,39 @@ macro_rules! step_query {
         $crate::cte_query!($expr)
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::QueryPart;
+    use crate::test_support::normalise_debug_sql;
+    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+
+    #[test]
+    fn seed_query_wraps_expression() {
+        let literal = sql::<Integer>("SELECT 1");
+        let wrapped = seed_query!(literal);
+        assert_sql_matches(&wrapped, "SELECT 1");
+    }
+
+    #[test]
+    fn step_query_wraps_expression() {
+        let literal = sql::<Integer>("SELECT n + 1 FROM t");
+        let wrapped = step_query!(literal);
+        assert_sql_matches(&wrapped, "SELECT n + 1 FROM t");
+    }
+
+    #[test]
+    fn cte_query_wraps_expression() {
+        let literal = sql::<Integer>("SELECT 42");
+        let wrapped = cte_query!(literal);
+        assert_sql_matches(&wrapped, "SELECT 42");
+    }
+
+    fn assert_sql_matches<T>(part: &QueryPart<T>, expected: &str)
+    where
+        T: diesel::query_builder::QueryFragment<Sqlite>,
+    {
+        let rendered = normalise_debug_sql(&debug_query::<Sqlite, _>(part).to_string());
+        assert_eq!(rendered, expected);
+    }
+}

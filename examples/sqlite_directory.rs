@@ -5,6 +5,16 @@ use diesel::{Connection, RunQueryDsl, dsl::sql, sql_types::Text, sqlite::SqliteC
 use diesel_cte_ext::RecursiveCTEExt;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run_directory_example()?;
+    Ok(())
+}
+
+/// Seeds a temporary table using `WITH` and returns the inserted labels.
+///
+/// # Errors
+/// Returns an error if `SQLite` cannot run the CTE or if the seeded values differ
+/// from the expected fixtures.
+pub fn run_directory_example() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut conn = SqliteConnection::establish(":memory:")?;
     let names: Vec<String> = SqliteConnection::with_cte(
         "seed",
@@ -18,5 +28,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if names != expected {
         return Err("seeded names deviated from expectation".into());
     }
-    Ok(())
+    Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seeds_directory_entries() {
+        let names = run_directory_example().expect("seeded names");
+        assert_eq!(names, vec!["Hello", "Diesel"]);
+    }
 }
