@@ -30,6 +30,22 @@ impl<Seed, Step, Body> RecursiveParts<Seed, Step, Body> {
     }
 }
 
+/// Query fragments used by a non-recursive CTE.
+#[derive(Debug, Clone)]
+pub struct CteParts<Cte, Body> {
+    /// Query producing the CTE rows.
+    pub cte: Cte,
+    /// Query consuming the CTE.
+    pub body: Body,
+}
+
+impl<Cte, Body> CteParts<Cte, Body> {
+    /// Bundle the CTE and body queries together.
+    pub const fn new(cte: Cte, body: Body) -> Self {
+        Self { cte, body }
+    }
+}
+
 /// Build a recursive CTE query.
 pub fn with_recursive<DB, Cols, Seed, Step, Body, ColSpec>(
     cte_name: &'static str,
@@ -57,8 +73,7 @@ where
 pub fn with_cte<DB, Cols, Cte, Body, ColSpec>(
     cte_name: &'static str,
     columns: ColSpec,
-    cte: Cte,
-    body: Body,
+    parts: CteParts<Cte, Body>,
 ) -> WithCte<DB, Cols, Cte, Body>
 where
     DB: Backend,
@@ -69,8 +84,8 @@ where
     WithCte {
         cte_name,
         columns: columns.into(),
-        cte,
-        body,
+        cte: parts.cte,
+        body: parts.body,
         _marker: std::marker::PhantomData,
     }
 }
@@ -104,8 +119,10 @@ mod tests {
         let query = with_cte::<Sqlite, _, _, _, _>(
             "nums",
             &["n"],
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>("SELECT n FROM nums"),
+            CteParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>("SELECT n FROM nums"),
+            ),
         );
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(

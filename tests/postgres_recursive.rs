@@ -107,8 +107,10 @@ fn non_recursive_cte_returns_seed(embedded_cluster: GuardedCluster) -> TestResul
         conn.with_cte(
             "seed",
             &["value"],
-            sql::<Integer>("SELECT 42"),
-            sql::<Integer>("SELECT value FROM seed"),
+            CteParts::new(
+                sql::<Integer>("SELECT 42"),
+                sql::<Integer>("SELECT value FROM seed"),
+            ),
         ),
         &mut conn,
     )?;

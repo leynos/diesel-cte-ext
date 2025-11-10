@@ -32,20 +32,22 @@ integration tests.
 ## Building non-recursive CTEs
 
 Use `with_cte` when you want a single `WITH` block without a recursive step.
-The helper accepts a CTE name, the column list, the CTE body, and the query
-that consumes it.
+Bundle the CTE body and the consuming query with `CteParts::new` before passing
+them to the helper.
 
 ```rust,no_run
 use diesel::{dsl::sql, sqlite::SqliteConnection, sql_types::Text, RunQueryDsl};
-use diesel_cte_ext::RecursiveCTEExt;
+use diesel_cte_ext::{CteParts, RecursiveCTEExt};
 
 fn names() -> diesel::QueryResult<Vec<String>> {
     let mut conn = SqliteConnection::establish(":memory:")?;
     conn.with_cte(
         "names",
         &["label"],
-        sql::<Text>("SELECT 'root' AS label UNION ALL SELECT 'child'"),
-        sql::<Text>("SELECT label FROM names ORDER BY label"),
+        CteParts::new(
+            sql::<Text>("SELECT 'root' AS label UNION ALL SELECT 'child'"),
+            sql::<Text>("SELECT label FROM names ORDER BY label"),
+        ),
     )
     .load(&mut conn)
 }

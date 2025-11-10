@@ -2,7 +2,7 @@
 //! Demonstrates non-recursive CTEs for seeding temporary data in `SQLite`.
 
 use diesel::{Connection, RunQueryDsl, dsl::sql, sql_types::Text, sqlite::SqliteConnection};
-use diesel_cte_ext::RecursiveCTEExt;
+use diesel_cte_ext::{CteParts, RecursiveCTEExt};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_directory_example()?;
@@ -20,8 +20,10 @@ pub fn run_directory_example() -> Result<Vec<String>, Box<dyn std::error::Error>
         .with_cte(
             "seed",
             &["message"],
-            sql::<Text>("SELECT 'Hello' AS message UNION ALL SELECT 'Diesel'"),
-            sql::<Text>("SELECT message FROM seed ORDER BY message DESC"),
+            CteParts::new(
+                sql::<Text>("SELECT 'Hello' AS message UNION ALL SELECT 'Diesel'"),
+                sql::<Text>("SELECT message FROM seed ORDER BY message DESC"),
+            ),
         )
         .load(&mut conn)?;
 

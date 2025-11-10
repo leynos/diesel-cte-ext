@@ -194,8 +194,10 @@ mod tests {
         let query = builders::with_cte::<Sqlite, _, _, _, _>(
             "seed",
             &["value"],
-            sql::<Integer>("SELECT 42"),
-            sql::<Integer>("SELECT value FROM seed"),
+            crate::builders::CteParts::new(
+                sql::<Integer>("SELECT 42"),
+                sql::<Integer>("SELECT value FROM seed"),
+            ),
         );
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(

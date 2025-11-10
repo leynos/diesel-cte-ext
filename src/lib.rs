@@ -12,6 +12,8 @@ pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_support;
 
+/// Bundles the CTE and body fragments handed to `with_cte`.
+pub use builders::CteParts;
 /// Bundles the seed, step, and body fragments handed to `with_recursive`.
 pub use builders::RecursiveParts;
 /// Builds a simple `WITH` block without the recursive union step.

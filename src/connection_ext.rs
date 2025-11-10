@@ -1,8 +1,7 @@
-//! Extension trait exposing a `with_recursive` method on Diesel connections.
+//! Extension trait exposing `with_recursive` and `with_cte` on Diesel connections.
 //!
-//! This trait provides convenient access to [`builders::with_recursive`] with
-//! backend inference from the connection type. Both synchronous and
-//! asynchronous Diesel connections implement `RecursiveCTEExt`.
+//! Both helpers delegate to the builders module whilst inferring the backend
+//! from the connection type, so callers never pass the backend explicitly.
 
 use diesel::query_builder::QueryFragment;
 
@@ -10,7 +9,7 @@ use diesel::query_builder::QueryFragment;
 use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 
 use crate::{
-    builders::{self, RecursiveParts},
+    builders::{self, CteParts, RecursiveParts},
     columns::Columns,
     cte::{RecursiveBackend, WithCte, WithRecursive},
 };
@@ -44,23 +43,18 @@ pub trait RecursiveCTEExt {
     }
 
     /// Create a [`WithCte`] builder for this connection's backend.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "API mirrors Diesel's with_cte builder signature"
-    )]
     fn with_cte<Cols, Cte, Body, ColSpec>(
         &self,
         cte_name: &'static str,
         columns: ColSpec,
-        cte: Cte,
-        body: Body,
+        parts: CteParts<Cte, Body>,
     ) -> WithCte<Self::Backend, Cols, Cte, Body>
     where
         Cte: QueryFragment<Self::Backend>,
         Body: QueryFragment<Self::Backend>,
         ColSpec: Into<Columns<Cols>>,
     {
-        builders::with_cte::<Self::Backend, Cols, _, _, _>(cte_name, columns, cte, body)
+        builders::with_cte::<Self::Backend, Cols, _, _, _>(cte_name, columns, parts)
     }
 }
 
@@ -118,8 +112,10 @@ mod tests {
         let query = conn.with_cte(
             "seed",
             &["value"],
-            sql::<Integer>("SELECT 42"),
-            sql::<Integer>("SELECT value FROM seed"),
+            CteParts::new(
+                sql::<Integer>("SELECT 42"),
+                sql::<Integer>("SELECT value FROM seed"),
+            ),
         );
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
