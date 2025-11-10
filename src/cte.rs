@@ -1,4 +1,4 @@
-//! Core types modeling CTE queries.
+//! Core types modelling CTE queries.
 //!
 //! [`WithRecursive`] represents recursive CTEs and [`WithCte`] represents
 //! non-recursive CTEs, both as raw query fragments. [`RecursiveBackend`] marks

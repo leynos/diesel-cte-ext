@@ -32,9 +32,12 @@ where
     }
 }
 
-impl<T> QueryId for QueryPart<T> {
-    type QueryId = ();
-    const HAS_STATIC_QUERY_ID: bool = false;
+impl<T> QueryId for QueryPart<T>
+where
+    T: QueryId,
+{
+    type QueryId = T::QueryId;
+    const HAS_STATIC_QUERY_ID: bool = T::HAS_STATIC_QUERY_ID;
 }
 
 #[macro_export]

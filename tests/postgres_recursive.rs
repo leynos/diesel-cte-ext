@@ -1,6 +1,9 @@
 #![cfg(feature = "postgres")]
 //! Behavioural tests for recursive CTE helpers on `PostgreSQL`.
 
+#[path = "test_helpers.rs"]
+mod test_helpers;
+
 use diesel::RunQueryDsl as DieselRunQueryDsl;
 use diesel::{dsl::sql, sql_types::Integer};
 #[cfg(feature = "async")]
@@ -11,38 +14,26 @@ use rstest::{fixture, rstest};
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
-fn configure_pg_embed_env() {
-    use std::{fs, path::PathBuf, sync::Once};
+fn configure_pg_embed_env() -> test_helpers::EnvVarGuard {
+    use std::path::PathBuf;
 
-    static INIT: Once = Once::new();
-    INIT.call_once(|| {
-        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/pg-embed");
-        let runtime = base.join("runtime");
-        let data = base.join("data");
-        if let Err(err) = fs::create_dir_all(&runtime) {
-            panic!("runtime directory: {err}");
-        }
-        if let Err(err) = fs::create_dir_all(&data) {
-            panic!("data directory: {err}");
-        }
-        unsafe {
-            std::env::set_var("PG_RUNTIME_DIR", runtime);
-            std::env::set_var("PG_DATA_DIR", data);
-        }
-    });
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/pg-embed");
+    let runtime = base.join("runtime");
+    let data = base.join("data");
+    test_helpers::EnvVarGuard::set_pg_paths(&runtime, &data)
 }
 
+type GuardedCluster = BootstrapResult<(test_helpers::EnvVarGuard, TestCluster)>;
+
 #[fixture]
-fn embedded_cluster() -> BootstrapResult<TestCluster> {
-    configure_pg_embed_env();
-    TestCluster::new()
+fn embedded_cluster() -> GuardedCluster {
+    let guard = configure_pg_embed_env();
+    TestCluster::new().map(|cluster| (guard, cluster))
 }
 
 #[rstest]
-fn recursive_sequence_via_sync_conn(
-    embedded_cluster: BootstrapResult<TestCluster>,
-) -> TestResult<()> {
-    let cluster = embedded_cluster?;
+fn recursive_sequence_via_sync_conn(embedded_cluster: GuardedCluster) -> TestResult<()> {
+    let (_env_guard, cluster) = embedded_cluster?;
     let mut conn = cluster.connection().diesel_connection("postgres")?;
 
     let rows: Vec<i32> = DieselRunQueryDsl::load(
@@ -67,12 +58,10 @@ fn recursive_sequence_via_sync_conn(
 
 #[cfg(feature = "async")]
 #[rstest]
-fn recursive_sequence_via_async_conn(
-    embedded_cluster: BootstrapResult<TestCluster>,
-) -> TestResult<()> {
+fn recursive_sequence_via_async_conn(embedded_cluster: GuardedCluster) -> TestResult<()> {
     use tokio::runtime::Builder;
 
-    let cluster = embedded_cluster?;
+    let (_env_guard, cluster) = embedded_cluster?;
     let rt = Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -110,10 +99,8 @@ fn recursive_sequence_via_async_conn(
 }
 
 #[rstest]
-fn non_recursive_cte_returns_seed(
-    embedded_cluster: BootstrapResult<TestCluster>,
-) -> TestResult<()> {
-    let cluster = embedded_cluster?;
+fn non_recursive_cte_returns_seed(embedded_cluster: GuardedCluster) -> TestResult<()> {
+    let (_env_guard, cluster) = embedded_cluster?;
     let mut conn = cluster.connection().diesel_connection("postgres")?;
 
     let result: i32 = DieselRunQueryDsl::get_result(

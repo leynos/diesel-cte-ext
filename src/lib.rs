@@ -16,8 +16,8 @@ pub(crate) mod test_support;
 pub use builders::RecursiveParts;
 /// Builds a simple `WITH` block without the recursive union step.
 pub use builders::with_cte;
-#[deprecated(note = "Use `RecursiveCTEExt::with_recursive` instead")]
 #[doc = "Legacy helper kept for backwards compatibility with 0.1.0 previews."]
+#[deprecated(note = "Use `RecursiveCTEExt::with_recursive` instead")]
 pub use builders::with_recursive;
 /// Runtime column names paired with compile-time schema metadata.
 pub use columns::Columns;
