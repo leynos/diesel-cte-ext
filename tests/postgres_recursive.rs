@@ -8,7 +8,7 @@ use diesel::RunQueryDsl as DieselRunQueryDsl;
 use diesel::{dsl::sql, sql_types::Integer};
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
-use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
+use diesel_cte_ext::{CteParts, RecursiveCTEExt, RecursiveParts};
 use pg_embedded_setup_unpriv::{BootstrapResult, TestCluster};
 use rstest::{fixture, rstest};
 
@@ -43,7 +43,7 @@ fn recursive_sequence_via_sync_conn(embedded_cluster: GuardedCluster) -> TestRes
             RecursiveParts::new(
                 sql::<Integer>("SELECT 1"),
                 sql::<Integer>("SELECT n + 1 FROM t WHERE n < 5"),
-                sql::<Integer>("SELECT n FROM t"),
+                sql::<Integer>("SELECT n FROM t ORDER BY n"),
             ),
         ),
         &mut conn,
@@ -80,7 +80,7 @@ fn recursive_sequence_via_async_conn(embedded_cluster: GuardedCluster) -> TestRe
                 RecursiveParts::new(
                     sql::<Integer>("SELECT 1"),
                     sql::<Integer>("SELECT n + 1 FROM t WHERE n < 5"),
-                    sql::<Integer>("SELECT n FROM t"),
+                    sql::<Integer>("SELECT n FROM t ORDER BY n"),
                 ),
             ),
             &mut conn,

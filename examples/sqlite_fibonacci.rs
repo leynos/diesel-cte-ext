@@ -23,7 +23,7 @@ pub fn run_fibonacci_example() -> Result<Vec<i32>, Box<dyn std::error::Error>> {
             RecursiveParts::new(
                 sql::<Integer>("SELECT 1"),
                 sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
-                sql::<Integer>("SELECT n FROM series"),
+                sql::<Integer>("SELECT n FROM series ORDER BY n"),
             ),
         )
         .load(&mut conn)?;
