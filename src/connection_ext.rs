@@ -14,8 +14,8 @@ use crate::{
     cte::{RecursiveBackend, WithCte, WithRecursive},
 };
 
-/// Extension trait providing a convenient `with_recursive` method on
-/// connection types.
+/// Extension trait providing convenient `with_recursive` and `with_cte` methods
+/// on connection types.
 ///
 /// The backend is inferred from the connection, so callers do not need to
 /// specify it explicitly.
@@ -43,6 +43,7 @@ pub trait RecursiveCTEExt {
     }
 
     /// Create a [`WithCte`] builder for this connection's backend.
+    #[doc(alias = "builders::with_cte")]
     fn with_cte<Cols, Cte, Body, ColSpec>(
         &self,
         cte_name: &'static str,

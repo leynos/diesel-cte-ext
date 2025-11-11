@@ -31,8 +31,8 @@ integration tests.
 
 ## Building non-recursive CTEs
 
-Use `with_cte` when you want a single `WITH` block without a recursive step.
-Bundle the CTE body and the consuming query with `CteParts::new` before passing
+Use `with_cte` to create a single `WITH` block without a recursive step.
+Bundle the CTE body and the consuming query using `CteParts::new` before passing
 them to the helper.
 
 ```rust,no_run
@@ -158,6 +158,6 @@ privileges. Running `make test` triggers the helper to:
 
 The `tests/postgres_recursive.rs` module demonstrates how to wrap the guard in
 an `rstest` fixture and propagate failures through the test signature instead
-of calling `unwrap`. Use this pattern when authoring new tests so the harness
-can skip gracefully on machines that cannot start PostgreSQL (for example, when
-`tzdata` is missing).
+of calling `unwrap`. This pattern should be reused when authoring new tests so
+the harness can skip gracefully on machines that cannot start PostgreSQL (for
+example, when `tzdata` is missing).
