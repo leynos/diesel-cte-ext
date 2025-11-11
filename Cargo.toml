@@ -90,5 +90,5 @@ async = ["dep:diesel-async"]
 diesel = { version = "2", default-features = false, features = ["sqlite", "postgres", "chrono"] }
 diesel-async = { version = "0.7", features = ["sqlite", "postgres", "tokio", "async-connection-wrapper"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-rstest = "0.21"
+rstest = "0.26"
 pg-embed-setup-unpriv = { version = "0.1.0", features = ["diesel-support"] }
