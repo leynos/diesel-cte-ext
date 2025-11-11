@@ -39,6 +39,7 @@ pub trait RecursiveCTEExt {
         Body: QueryFragment<Self::Backend>,
         ColSpec: Into<Columns<Cols>>,
     {
+        let _ = self;
         builders::with_recursive::<Self::Backend, Cols, _, _, _, _>(cte_name, columns, parts)
     }
 
@@ -55,6 +56,7 @@ pub trait RecursiveCTEExt {
         Body: QueryFragment<Self::Backend>,
         ColSpec: Into<Columns<Cols>>,
     {
+        let _ = self;
         builders::with_cte::<Self::Backend, Cols, _, _, _>(cte_name, columns, parts)
     }
 }
