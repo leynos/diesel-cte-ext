@@ -48,11 +48,6 @@ macro_rules! define_recursive_cte {
         define_recursive_cte!(@impl $name, $union_sql, $doc);
     };
 
-    // ($name:ident, $doc:expr)=>{
-    //   define_recursive_cte!(@impl $name, "");
-    // };
-
-
     // recursive (non-empty union string)
     (@impl $name:ident, $union_sql:expr, $doc:expr) => {
         #[doc = $doc]
@@ -218,7 +213,7 @@ mod tests {
 
     #[test]
     fn with_recursive_not_all_renders_expected_sql() {
-        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>(
+        let query = builders::with_recursive_not_all::<Sqlite, _, _, _, _, _>(
             "nums",
             &["n"],
             RecursiveParts::new(

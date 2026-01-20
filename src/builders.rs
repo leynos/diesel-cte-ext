@@ -9,8 +9,35 @@ use diesel::{backend::Backend, query_builder::QueryFragment};
 
 use crate::{
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive},
+    cte::{RecursiveBackend, WithCte, WithRecursive, WithRecursiveNotAll},
 };
+
+macro_rules! impl_recursive_builder {
+    ($fn_name:ident, $struct:ident, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $fn_name<DB, Cols, Seed, Step, Body, ColSpec>(
+            cte_name: &'static str,
+            columns: ColSpec,
+            parts: RecursiveParts<Seed, Step, Body>,
+        ) -> $struct<DB, Cols, Seed, Step, Body>
+        where
+            DB: RecursiveBackend,
+            Seed: QueryFragment<DB>,
+            Step: QueryFragment<DB>,
+            Body: QueryFragment<DB>,
+            ColSpec: Into<Columns<Cols>>,
+        {
+            $struct {
+                cte_name,
+                columns: columns.into(),
+                seed: parts.seed,
+                step: parts.step,
+                body: parts.body,
+                _marker: std::marker::PhantomData,
+            }
+        }
+    };
+}
 
 /// Query fragments used by a recursive CTE.
 #[derive(Debug, Clone)]
@@ -46,28 +73,17 @@ impl<Cte, Body> CteParts<Cte, Body> {
     }
 }
 
-/// Build a recursive CTE query.
-pub fn with_recursive<DB, Cols, Seed, Step, Body, ColSpec>(
-    cte_name: &'static str,
-    columns: ColSpec,
-    parts: RecursiveParts<Seed, Step, Body>,
-) -> WithRecursive<DB, Cols, Seed, Step, Body>
-where
-    DB: RecursiveBackend,
-    Seed: QueryFragment<DB>,
-    Step: QueryFragment<DB>,
-    Body: QueryFragment<DB>,
-    ColSpec: Into<Columns<Cols>>,
-{
-    WithRecursive {
-        cte_name,
-        columns: columns.into(),
-        seed: parts.seed,
-        step: parts.step,
-        body: parts.body,
-        _marker: std::marker::PhantomData,
-    }
-}
+impl_recursive_builder!(
+    with_recursive,
+    WithRecursive,
+    "Build a recursive CTE query using `WITH RECURSIVE` and `UNION ALL`."
+);
+
+impl_recursive_builder!(
+    with_recursive_not_all,
+    WithRecursiveNotAll,
+    "Build a recursive CTE query using `WITH RECURSIVE` and `UNION` (not `ALL`)."
+);
 
 /// Build a non-recursive CTE query.
 pub fn with_cte<DB, Cols, Cte, Body, ColSpec>(
@@ -111,6 +127,24 @@ mod tests {
         assert_eq!(
             sql,
             "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums) SELECT n FROM nums"
+        );
+    }
+
+    #[test]
+    fn recursive_builder_not_all_composes_fragments() {
+        let query = with_recursive_not_all::<Sqlite, _, _, _, _, _>(
+            "nums",
+            &["n"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>("SELECT n + 1 FROM nums"),
+                sql::<Integer>("SELECT n FROM nums"),
+            ),
+        );
+        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums) SELECT n FROM nums"
         );
     }
 
