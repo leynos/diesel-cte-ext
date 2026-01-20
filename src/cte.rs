@@ -166,7 +166,6 @@ where
     }
 }
 
-impl_cte_traits!(WithRecursive<Seed, Step, Body>, Body);
 impl_cte_traits!(WithCte<Cte, Body>, Body);
 
 #[cfg(test)]
@@ -206,6 +205,25 @@ mod tests {
         assert_eq!(
             sql,
             "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
+        );
+    }
+
+    #[test]
+    fn with_recursive_not_all_renders_expected_sql() {
+        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>(
+            "nums",
+            &["n"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
+                sql::<Integer>("SELECT n FROM nums"),
+            ),
+        );
+
+        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
         );
     }
 
