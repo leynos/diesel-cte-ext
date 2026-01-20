@@ -45,7 +45,7 @@ macro_rules! impl_cte_traits {
 }
 macro_rules! define_recursive_cte {
     ($name:ident, $union_sql:expr, $doc:expr) => {
-        define_recursive_cte!(@impl $name, $union_sql);
+        define_recursive_cte!(@impl $name, $union_sql, $doc);
     };
 
     // ($name:ident, $doc:expr)=>{
