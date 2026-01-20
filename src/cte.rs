@@ -44,18 +44,18 @@ macro_rules! impl_cte_traits {
     };
 }
 macro_rules! define_recursive_cte {
-    ($name:ident, $union_sql:expr) => {
+    ($name:ident, $union_sql:expr, $doc:expr) => {
         define_recursive_cte!(@impl $name, $union_sql);
     };
 
-    ($name:ident)=>{
-      define_recursive_cte!(@impl $name, "");
-    };
-
+    // ($name:ident, $doc:expr)=>{
+    //   define_recursive_cte!(@impl $name, "");
+    // };
 
 
     // recursive (non-empty union string)
-    (@impl $name:ident, $union_sql:expr) => {
+    (@impl $name:ident, $union_sql:expr, $doc:expr) => {
+        #[doc = $doc]
         #[derive(Debug, Clone)]
         pub struct $name<DB: Backend, Cols, Seed, Step, Body> {
             pub(crate) cte_name: &'static str,
@@ -136,8 +136,16 @@ impl RecursiveBackend for diesel::sqlite::Sqlite {}
 #[cfg(feature = "postgres")]
 impl RecursiveBackend for diesel::pg::Pg {}
 
-define_recursive_cte!(WithRecursiveNotAll, " UNION ");
-define_recursive_cte!(WithRecursive, " UNION ALL ");
+define_recursive_cte!(
+    WithRecursiveNotAll,
+    " UNION ",
+    "Representation of a recursive CTE query."
+);
+define_recursive_cte!(
+    WithRecursive,
+    " UNION ALL ",
+    "Representation of a recursive CTE query without UNION ALL"
+);
 
 /// Representation of a non-recursive CTE query.
 #[derive(Debug, Clone)]
