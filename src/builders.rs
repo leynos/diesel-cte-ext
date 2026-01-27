@@ -9,9 +9,8 @@ use diesel::{backend::Backend, query_builder::QueryFragment};
 
 use crate::{
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive},
+    cte::{RecursiveBackend, UnionKind, WithCte, WithRecursive},
 };
-use crate::cte::UnionKind;
 
 macro_rules! impl_recursive_builder {
     ($fn_name:ident, $union_kind:expr, $doc:expr) => {
@@ -34,7 +33,7 @@ macro_rules! impl_recursive_builder {
                 seed: parts.seed,
                 step: parts.step,
                 body: parts.body,
-                union_kind: $union_kind
+                union_kind: $union_kind,
                 _marker: std::marker::PhantomData,
             }
         }

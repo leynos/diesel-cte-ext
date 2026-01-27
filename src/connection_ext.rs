@@ -1,4 +1,3 @@
-
 //! Extension trait exposing `with_recursive` and `with_cte` on Diesel connections.
 //!
 //! Both helpers delegate to the builders module whilst inferring the backend
@@ -12,7 +11,7 @@ use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use crate::{
     builders::{self, CteParts, RecursiveParts},
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive, WithRecursiveNotAll},
+    cte::{RecursiveBackend, WithCte, WithRecursive},
 };
 
 /// Small helper to generate `with_recursive*` methods on the trait without
@@ -59,10 +58,10 @@ pub trait RecursiveCTEExt {
 
     impl_with_recursive_methods!(
         with_recursive_not_all,
-        WithRecursiveNotAll,
+        WithRecursive,
         "builders::with_recursive_not_all",
         r#"Create a [`WithRecursiveNotAll`] builder for this connection's backend.
-        
+
         See [`builders::with_recursive_not_all`] for parameter details."#
     );
 
