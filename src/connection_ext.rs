@@ -60,7 +60,10 @@ pub trait RecursiveCTEExt {
         with_recursive_not_all,
         WithRecursive,
         "builders::with_recursive_not_all",
-        r#"Create a [`WithRecursiveNotAll`] builder for this connection's backend.
+        r#"Doc alias referencing `builders::with_recursive_not_all`.
+        
+        Creates a `WithRecursive` builder for this connection's backend that uses
+        `UNION` (without `ALL`) for the recursive step.
 
         See [`builders::with_recursive_not_all`] for parameter details."#
     );
