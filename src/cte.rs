@@ -188,7 +188,23 @@ mod tests {
         builders::{self, RecursiveParts},
         test_support::normalise_debug_sql,
     };
-    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite};
+    use rstest::{fixture, rstest};
+
+    enum Builder {
+        All,
+        Distinct,
+    }
+
+    #[fixture]
+    fn sample_parts()
+    -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
+            sql::<Integer>("SELECT n FROM nums"),
+        )
+    }
 
     #[test]
     fn duplicate_column_names_are_rejected() {
@@ -202,41 +218,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn with_recursive_renders_expected_sql() {
-        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
-                sql::<Integer>("SELECT n FROM nums"),
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn with_recursive_renders_expected_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
+        let query = match builder {
+            Builder::All => builders::with_recursive::<Sqlite, _, _, _, _, _>(
+                "nums",
+                &["n"],
+                sample_parts,
             ),
-        );
+            Builder::Distinct => builders::with_recursive_not_all::<Sqlite, _, _, _, _, _>(
+                "nums",
+                &["n"],
+                sample_parts,
+            ),
+        };
 
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
-        );
-    }
-
-    #[test]
-    fn with_recursive_not_all_renders_expected_sql() {
-        let query = builders::with_recursive_not_all::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
-                sql::<Integer>("SELECT n FROM nums"),
-            ),
-        );
-
-        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
-        assert_eq!(
-            sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums")
         );
     }
 

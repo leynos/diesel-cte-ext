@@ -116,34 +116,53 @@ mod tests {
     use crate::{builders::RecursiveParts, test_support::normalise_debug_sql};
     use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
     use std::marker::PhantomData;
+    use rstest::{fixture, rstest};
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn sqlite_backend_builds_recursive_sql() {
-        use diesel::sqlite::Sqlite;
+    use diesel::sqlite::Sqlite;
 
-        let conn = DummyConn::<Sqlite>::default();
-        let query = conn.with_recursive("nums", &["n"], sample_parts());
-        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql());
+    #[cfg(feature = "postgres")]
+    use diesel::pg::Pg;
+
+    enum Builder {
+        All,
+        Distinct,
+    }
+
+    #[fixture]
+    fn sample_parts()
+    -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 5"),
+            sql::<Integer>("SELECT n FROM nums"),
+        )
     }
 
     #[cfg(feature = "sqlite")]
-    #[test]
-    fn sqlite_backend_builds_recursive_sql_not_all() {
-        use diesel::sqlite::Sqlite;
-
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn sqlite_backend_builds_recursive_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
         let conn = DummyConn::<Sqlite>::default();
-        let query = conn.with_recursive_not_all("nums", &["n"], sample_parts());
+        let query = match builder {
+            Builder::All => conn.with_recursive("nums", &["n"], sample_parts),
+            Builder::Distinct => conn.with_recursive_not_all("nums", &["n"], sample_parts),
+        };
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql_not_all());
+        assert_eq!(
+            sql,
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums")
+        );
     }
 
     #[cfg(feature = "sqlite")]
     #[test]
     fn sqlite_backend_builds_cte_sql() {
-        use diesel::sqlite::Sqlite;
-
         let conn = DummyConn::<Sqlite>::default();
         let query = conn.with_cte(
             "seed",
@@ -161,25 +180,24 @@ mod tests {
     }
 
     #[cfg(feature = "postgres")]
-    #[test]
-    fn postgres_backend_builds_recursive_sql() {
-        use diesel::pg::Pg;
-
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn postgres_backend_builds_recursive_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
         let conn = DummyConn::<Pg>::default();
-        let query = conn.with_recursive("nums", &["n"], sample_parts());
+        let query = match builder {
+            Builder::All => conn.with_recursive("nums", &["n"], sample_parts),
+            Builder::Distinct => conn.with_recursive_not_all("nums", &["n"], sample_parts),
+        };
         let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql());
-    }
-
-    #[cfg(feature = "postgres")]
-    #[test]
-    fn postgres_backend_builds_recursive_sql_not_all() {
-        use diesel::pg::Pg;
-
-        let conn = DummyConn::<Pg>::default();
-        let query = conn.with_recursive_not_all("nums", &["n"], sample_parts());
-        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
-        assert_eq!(sql, expected_recursive_sql_not_all());
+        assert_eq!(
+            sql,
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums")
+        );
     }
 
     #[test]
@@ -203,23 +221,6 @@ mod tests {
             #[cfg(feature = "async")]
             assert_impl::<diesel_async::AsyncPgConnection>();
         }
-    }
-
-    fn sample_parts()
-    -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
-        RecursiveParts::new(
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 5"),
-            sql::<Integer>("SELECT n FROM nums"),
-        )
-    }
-
-    fn expected_recursive_sql() -> &'static str {
-        "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
-    }
-
-    fn expected_recursive_sql_not_all() -> &'static str {
-        "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
     }
 
     #[derive(Default)]
