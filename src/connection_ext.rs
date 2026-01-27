@@ -1,3 +1,4 @@
+
 //! Extension trait exposing `with_recursive` and `with_cte` on Diesel connections.
 //!
 //! Both helpers delegate to the builders module whilst inferring the backend
@@ -11,8 +12,32 @@ use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use crate::{
     builders::{self, CteParts, RecursiveParts},
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive},
+    cte::{RecursiveBackend, WithCte, WithRecursive, WithRecursiveNotAll},
 };
+
+/// Small helper to generate `with_recursive*` methods on the trait without
+/// duplicating boilerplate.
+macro_rules! impl_with_recursive_methods {
+    ($fn_name:ident, $ret:ident, $alias:expr, $doc:expr) => {
+        #[doc = $doc]
+        #[doc(alias = $alias)]
+        fn $fn_name<Cols, Seed, Step, Body, ColSpec>(
+            &self,
+            cte_name: &'static str,
+            columns: ColSpec,
+            parts: RecursiveParts<Seed, Step, Body>,
+        ) -> $ret<Self::Backend, Cols, Seed, Step, Body>
+        where
+            Seed: QueryFragment<Self::Backend>,
+            Step: QueryFragment<Self::Backend>,
+            Body: QueryFragment<Self::Backend>,
+            ColSpec: Into<Columns<Cols>>,
+        {
+            let _ = self;
+            builders::$fn_name::<Self::Backend, Cols, _, _, _, _>(cte_name, columns, parts)
+        }
+    };
+}
 
 /// Extension trait providing convenient `with_recursive` and `with_cte` methods
 /// on connection types.
@@ -23,25 +48,23 @@ pub trait RecursiveCTEExt {
     /// Backend associated with the connection.
     type Backend: RecursiveBackend;
 
-    /// Create a [`WithRecursive`] builder for this connection's backend.
-    ///
-    /// See [`builders::with_recursive`] for parameter details.
-    #[doc(alias = "builders::with_recursive")]
-    fn with_recursive<Cols, Seed, Step, Body, ColSpec>(
-        &self,
-        cte_name: &'static str,
-        columns: ColSpec,
-        parts: RecursiveParts<Seed, Step, Body>,
-    ) -> WithRecursive<Self::Backend, Cols, Seed, Step, Body>
-    where
-        Seed: QueryFragment<Self::Backend>,
-        Step: QueryFragment<Self::Backend>,
-        Body: QueryFragment<Self::Backend>,
-        ColSpec: Into<Columns<Cols>>,
-    {
-        let _ = self;
-        builders::with_recursive::<Self::Backend, Cols, _, _, _, _>(cte_name, columns, parts)
-    }
+    impl_with_recursive_methods!(
+        with_recursive,
+        WithRecursive,
+        "builders::with_recursive",
+        r#"Create a [`WithRecursive`] builder for this connection's backend.
+        
+        See [`builders::with_recursive`] for parameter details."#
+    );
+
+    impl_with_recursive_methods!(
+        with_recursive_not_all,
+        WithRecursiveNotAll,
+        "builders::with_recursive_not_all",
+        r#"Create a [`WithRecursiveNotAll`] builder for this connection's backend.
+        
+        See [`builders::with_recursive_not_all`] for parameter details."#
+    );
 
     /// Create a [`WithCte`] builder for this connection's backend.
     #[doc(alias = "builders::with_cte")]
@@ -108,6 +131,17 @@ mod tests {
 
     #[cfg(feature = "sqlite")]
     #[test]
+    fn sqlite_backend_builds_recursive_sql_not_all() {
+        use diesel::sqlite::Sqlite;
+
+        let conn = DummyConn::<Sqlite>::default();
+        let query = conn.with_recursive_not_all("nums", &["n"], sample_parts());
+        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
+        assert_eq!(sql, expected_recursive_sql_not_all());
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[test]
     fn sqlite_backend_builds_cte_sql() {
         use diesel::sqlite::Sqlite;
 
@@ -136,6 +170,17 @@ mod tests {
         let query = conn.with_recursive("nums", &["n"], sample_parts());
         let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
         assert_eq!(sql, expected_recursive_sql());
+    }
+
+    #[cfg(feature = "postgres")]
+    #[test]
+    fn postgres_backend_builds_recursive_sql_not_all() {
+        use diesel::pg::Pg;
+
+        let conn = DummyConn::<Pg>::default();
+        let query = conn.with_recursive_not_all("nums", &["n"], sample_parts());
+        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
+        assert_eq!(sql, expected_recursive_sql_not_all());
     }
 
     #[test]
@@ -172,6 +217,10 @@ mod tests {
 
     fn expected_recursive_sql() -> &'static str {
         "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
+    }
+
+    fn expected_recursive_sql_not_all() -> &'static str {
+        "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
     }
 
     #[derive(Default)]
