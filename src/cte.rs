@@ -119,6 +119,7 @@ impl UnionKind {
     }
 }
 
+/// Representation of a recursive CTE query.
 #[derive(Debug, Clone)]
 pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
     pub(crate) cte_name: &'static str,
