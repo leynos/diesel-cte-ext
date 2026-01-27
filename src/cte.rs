@@ -134,12 +134,12 @@ impl RecursiveBackend for diesel::pg::Pg {}
 define_recursive_cte!(
     WithRecursiveNotAll,
     " UNION ",
-    "Representation of a recursive CTE query."
+    "Representation of a recursive CTE query  without UNION ALL."
 );
 define_recursive_cte!(
     WithRecursive,
     " UNION ALL ",
-    "Representation of a recursive CTE query without UNION ALL"
+    "Representation of a recursive CTE query."
 );
 
 /// Representation of a non-recursive CTE query.
