@@ -9,17 +9,18 @@ use diesel::{backend::Backend, query_builder::QueryFragment};
 
 use crate::{
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive, WithRecursiveNotAll},
+    cte::{RecursiveBackend, WithCte, WithRecursive},
 };
+use crate::cte::UnionKind;
 
 macro_rules! impl_recursive_builder {
-    ($fn_name:ident, $struct:ident, $doc:expr) => {
+    ($fn_name:ident, $union_kind:expr, $doc:expr) => {
         #[doc = $doc]
         pub fn $fn_name<DB, Cols, Seed, Step, Body, ColSpec>(
             cte_name: &'static str,
             columns: ColSpec,
             parts: RecursiveParts<Seed, Step, Body>,
-        ) -> $struct<DB, Cols, Seed, Step, Body>
+        ) -> WithRecursive<DB, Cols, Seed, Step, Body>
         where
             DB: RecursiveBackend,
             Seed: QueryFragment<DB>,
@@ -27,12 +28,13 @@ macro_rules! impl_recursive_builder {
             Body: QueryFragment<DB>,
             ColSpec: Into<Columns<Cols>>,
         {
-            $struct {
+            WithRecursive {
                 cte_name,
                 columns: columns.into(),
                 seed: parts.seed,
                 step: parts.step,
                 body: parts.body,
+                union_kind: $union_kind
                 _marker: std::marker::PhantomData,
             }
         }
@@ -75,13 +77,13 @@ impl<Cte, Body> CteParts<Cte, Body> {
 
 impl_recursive_builder!(
     with_recursive,
-    WithRecursive,
+    UnionKind::All,
     "Build a recursive CTE query using `WITH RECURSIVE` and `UNION ALL`."
 );
 
 impl_recursive_builder!(
     with_recursive_not_all,
-    WithRecursiveNotAll,
+    UnionKind::Distinct,
     "Build a recursive CTE query using `WITH RECURSIVE` and `UNION` (not `ALL`)."
 );
 

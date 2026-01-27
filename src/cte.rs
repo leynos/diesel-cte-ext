@@ -131,16 +131,67 @@ impl RecursiveBackend for diesel::sqlite::Sqlite {}
 #[cfg(feature = "postgres")]
 impl RecursiveBackend for diesel::pg::Pg {}
 
-define_recursive_cte!(
-    WithRecursiveNotAll,
-    " UNION ",
-    "Representation of a recursive CTE query  without UNION ALL."
-);
-define_recursive_cte!(
-    WithRecursive,
-    " UNION ALL ",
-    "Representation of a recursive CTE query."
-);
+/// Specifies how the seed and recursive step queries are combined in a
+/// recursive CTE.
+///
+/// - `All` corresponds to `UNION ALL`, preserving duplicate rows between the
+///   seed and step results.
+/// - `Distinct` corresponds to `UNION`, which removes duplicate rows.
+#[derive(Debug, Clone, Copy)]
+pub enum UnionKind {
+    /// Use `UNION ALL` between the seed and step queries.
+    All,
+    /// Use `UNION` between the seed and step queries (duplicates removed).
+    Distinct,
+}
+impl UnionKind {
+    /// Returns the SQL fragment used to combine the seed and recursive step of a
+    /// recursive CTE.
+    ///
+    /// The returned string includes leading and trailing spaces so it can be
+    /// concatenated directly into the generated SQL without adding extra
+    /// separators.
+    ///
+    /// - `UnionKind::All` -> `" UNION ALL "` (preserves duplicate rows)
+    /// - `UnionKind::Distinct` -> `" UNION "` (removes duplicate rows)
+    fn as_sql(&self) -> &'static str {
+        match self {
+            UnionKind::All => " UNION ALL ",
+            UnionKind::Distinct => " UNION ",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
+    pub(crate) cte_name: &'static str,
+    pub(crate) columns: Columns<Cols>,
+    pub(crate) seed: Seed,
+    pub(crate) step: Step,
+    pub(crate) body: Body,
+    pub(crate) union_kind: UnionKind,
+    pub(crate) _marker: std::marker::PhantomData<DB>,
+}
+
+impl<DB, Cols, Seed, Step, Body> QueryFragment<DB> for WithRecursive<DB, Cols, Seed, Step, Body>
+where
+    DB: Backend,
+    Seed: QueryFragment<DB>,
+    Step: QueryFragment<DB>,
+    Body: QueryFragment<DB>,
+{
+    fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, DB>) -> QueryResult<()> {
+        out.push_sql("WITH RECURSIVE ");
+        out.push_identifier(self.cte_name)?;
+        push_identifiers(&mut out, &self.columns)?;
+        out.push_sql(" AS (");
+        self.seed.walk_ast(out.reborrow())?;
+        out.push_sql(self.union_kind.as_sql());
+        self.step.walk_ast(out.reborrow())?;
+        out.push_sql(") ");
+        self.body.walk_ast(out.reborrow())
+    }
+}
 
 /// Representation of a non-recursive CTE query.
 #[derive(Debug, Clone)]
@@ -170,6 +221,7 @@ where
 }
 
 impl_cte_traits!(WithCte<Cte, Body>, Body);
+impl_cte_traits!(WithRecursive<Seed, Step, Body>, Body);
 
 #[cfg(test)]
 mod tests {
