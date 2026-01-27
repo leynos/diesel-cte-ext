@@ -31,9 +31,9 @@ integration tests.
 
 ## Building non-recursive CTEs
 
-Use `with_cte` to create a single `WITH` block without a recursive step.
-Bundle the CTE body and the consuming query using `CteParts::new` before passing
-them to the helper.
+Use `with_cte` to create a single `WITH` block without a recursive step. Bundle
+the CTE body and the consuming query using `CteParts::new` before passing them
+to the helper.
 
 ```rust,no_run
 use diesel::{dsl::sql, sqlite::SqliteConnection, sql_types::Text, RunQueryDsl};
