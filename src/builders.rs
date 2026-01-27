@@ -111,41 +111,41 @@ where
 mod tests {
     use super::*;
     use crate::test_support::normalise_debug_sql;
-    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite};
+    use rstest::{fixture, rstest};
 
-    #[test]
-    fn recursive_builder_composes_fragments() {
-        let query = with_recursive::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums"),
-                sql::<Integer>("SELECT n FROM nums"),
-            ),
-        );
-        let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
-        assert_eq!(
-            sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums) SELECT n FROM nums"
-        );
+    type TestRecursiveParts = RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>;
+
+    enum Builder {
+        All,
+        Distinct,
     }
 
-    #[test]
-    fn recursive_builder_not_all_composes_fragments() {
-        let query = with_recursive_not_all::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums"),
-                sql::<Integer>("SELECT n FROM nums"),
-            ),
-        );
+    #[fixture]
+    fn recursive_parts() -> TestRecursiveParts {
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n + 1 FROM nums"),
+            sql::<Integer>("SELECT n FROM nums"),
+        )
+    }
+
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn recursive_builder_composes_fragments(
+        recursive_parts: TestRecursiveParts,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
+        let query = match builder {
+            Builder::All => with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
+            Builder::Distinct => with_recursive_not_all::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
+        };
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION SELECT n + 1 FROM nums) SELECT n FROM nums"
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums) SELECT n FROM nums")
         );
     }
 
