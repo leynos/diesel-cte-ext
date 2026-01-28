@@ -15,6 +15,7 @@ use pg_embedded_setup_unpriv::{
     detect_execution_privileges,
 };
 use rstest::{fixture, rstest};
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -117,26 +118,49 @@ fn parse_cargo_lock_version(contents: &str, crate_name: &str) -> Option<String> 
 fn pg_embed_manifest_path() -> PathBuf {
     WORKER_MANIFEST
         .get_or_init(|| {
-            let cargo_home = std::env::var_os("CARGO_HOME")
-                .map(PathBuf::from)
-                .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cargo")))
-                .unwrap_or_else(|| {
-                    panic!("CARGO_HOME or HOME must be set to locate the Cargo registry")
-                });
-            let src_dir = cargo_home.join("registry").join("src");
-            let crate_dir = format!("pg-embed-setup-unpriv-{}", pg_embed_setup_unpriv_version());
-            let entries = std::fs::read_dir(&src_dir)
-                .unwrap_or_else(|err| panic!("failed to read cargo registry: {err}"));
-            for entry in entries.flatten() {
-                let candidate = entry.path().join(&crate_dir).join("Cargo.toml");
-                if candidate.is_file() {
-                    return candidate;
+            let output = Command::new("cargo")
+                .arg("metadata")
+                .arg("--format-version")
+                .arg("1")
+                .arg("--locked")
+                .output()
+                .unwrap_or_else(|err| panic!("failed to run cargo metadata: {err}"));
+            assert!(
+                output.status.success(),
+                "cargo metadata failed with status {}",
+                output.status
+            );
+            let metadata: Value = serde_json::from_slice(&output.stdout)
+                .unwrap_or_else(|err| panic!("failed to parse cargo metadata output: {err}"));
+            let packages = metadata
+                .get("packages")
+                .and_then(Value::as_array)
+                .unwrap_or_else(|| panic!("cargo metadata output missing packages"));
+            let desired_version = pg_embed_setup_unpriv_version();
+            let mut fallback_manifest = None;
+            for package in packages {
+                let name = package.get("name").and_then(Value::as_str);
+                if name != Some("pg-embed-setup-unpriv") {
+                    continue;
+                }
+                let manifest_path = package
+                    .get("manifest_path")
+                    .and_then(Value::as_str)
+                    .map_or_else(
+                        || panic!("pg-embed-setup-unpriv manifest_path missing in metadata"),
+                        PathBuf::from,
+                    );
+                let version = package.get("version").and_then(Value::as_str);
+                if version == Some(desired_version.as_str()) {
+                    return manifest_path;
+                }
+                if fallback_manifest.is_none() {
+                    fallback_manifest = Some(manifest_path);
                 }
             }
-            panic!(
-                "pg-embed-setup-unpriv manifest not found under {}",
-                src_dir.display()
-            );
+            fallback_manifest.unwrap_or_else(|| {
+                panic!("pg-embed-setup-unpriv not found in cargo metadata packages")
+            })
         })
         .clone()
 }

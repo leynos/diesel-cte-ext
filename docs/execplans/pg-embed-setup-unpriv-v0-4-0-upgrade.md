@@ -48,7 +48,7 @@ supporting documentation while ensuring the standard quality gates pass.
     `ensure_template_exists` and any required setup/migrations.
   - Create a per-test `TemporaryDatabase` via
     `temporary_database_from_template`, returning its URL/connection handle to
-    tests and allowing Resource Acquisition Is Initialisation (RAII) cleanup.
+    tests and allowing Resource Acquisition Is Initialization (RAII) cleanup.
 - [ ] Update `tests/postgres_recursive.rs` to use the templated database URL (or
     Diesel connection) instead of `database_url("postgres")`.
 - [ ] Update documentation that references the test harness if the connection or

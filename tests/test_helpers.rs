@@ -73,6 +73,14 @@ fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
     }
 }
 
+/// Restore an environment variable from a captured value.
+pub fn restore_env_var(name: &str, value: Option<&OsString>) {
+    match value {
+        Some(stored) => unsafe { env::set_var(name, stored) },
+        None => unsafe { env::remove_var(name) },
+    }
+}
+
 /// Serialises access to pg-embed environment variables and restores them on drop.
 pub struct EnvVarGuard {
     _lock: MutexGuard<'static, ()>,
@@ -117,19 +125,8 @@ impl EnvVarGuard {
 
 impl Drop for EnvVarGuard {
     fn drop(&mut self) {
-        match self.previous_runtime.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_RUNTIME_DIR", value) },
-            None => unsafe { env::remove_var("PG_RUNTIME_DIR") },
-        }
-
-        match self.previous_data.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_DATA_DIR", value) },
-            None => unsafe { env::remove_var("PG_DATA_DIR") },
-        }
-
-        match self.previous_password.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_PASSWORD", value) },
-            None => unsafe { env::remove_var("PG_PASSWORD") },
-        }
+        restore_env_var("PG_RUNTIME_DIR", self.previous_runtime.as_ref());
+        restore_env_var("PG_DATA_DIR", self.previous_data.as_ref());
+        restore_env_var("PG_PASSWORD", self.previous_password.as_ref());
     }
 }

@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use rstest::rstest;
+
 static TEMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn test_lock() -> MutexGuard<'static, ()> {
@@ -38,20 +40,9 @@ impl EnvRestore {
 
 impl Drop for EnvRestore {
     fn drop(&mut self) {
-        match self.runtime.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_RUNTIME_DIR", value) },
-            None => unsafe { env::remove_var("PG_RUNTIME_DIR") },
-        }
-
-        match self.data.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_DATA_DIR", value) },
-            None => unsafe { env::remove_var("PG_DATA_DIR") },
-        }
-
-        match self.password.as_ref() {
-            Some(value) => unsafe { env::set_var("PG_PASSWORD", value) },
-            None => unsafe { env::remove_var("PG_PASSWORD") },
-        }
+        test_helpers::restore_env_var("PG_RUNTIME_DIR", self.runtime.as_ref());
+        test_helpers::restore_env_var("PG_DATA_DIR", self.data.as_ref());
+        test_helpers::restore_env_var("PG_PASSWORD", self.password.as_ref());
     }
 }
 
@@ -75,6 +66,26 @@ fn unique_temp_dir() -> PathBuf {
 fn remove_temp_dir(path: &Path) {
     if path.exists() {
         fs::remove_dir_all(path).unwrap_or_else(|err| panic!("remove temp dir: {err}"));
+    }
+}
+
+fn set_env_var(name: &str, new_value: Option<&str>) {
+    match new_value {
+        Some(value) => unsafe { env::set_var(name, value) },
+        None => unsafe { env::remove_var(name) },
+    }
+}
+
+fn assert_env_var(name: &str, expected_value: Option<&str>) {
+    match expected_value {
+        Some(expected) => {
+            let value = env::var(name).unwrap_or_else(|err| panic!("{name} should be set: {err}"));
+            assert_eq!(value, expected, "{name} should be restored");
+        }
+        None => assert!(
+            env::var_os(name).is_none(),
+            "{name} should be unset after restore"
+        ),
     }
 }
 
@@ -110,15 +121,23 @@ fn set_pg_paths_resets_data_dir_and_pgpass() {
     remove_temp_dir(&base);
 }
 
-#[test]
-fn set_pg_paths_sets_and_restores_env_vars_when_pre_set() {
+#[rstest]
+#[case::pre_set(
+    Some("pre_existing_runtime"),
+    Some("pre_existing_data"),
+    Some("pre_existing_password")
+)]
+#[case::unset(None, None, None)]
+fn set_pg_paths_sets_and_restores_env_vars(
+    #[case] initial_runtime: Option<&'static str>,
+    #[case] initial_data: Option<&'static str>,
+    #[case] initial_password: Option<&'static str>,
+) {
     let _lock = test_lock();
     let _restore = EnvRestore::capture();
-    unsafe {
-        env::set_var("PG_RUNTIME_DIR", "pre_existing_runtime");
-        env::set_var("PG_DATA_DIR", "pre_existing_data");
-        env::set_var("PG_PASSWORD", "pre_existing_password");
-    }
+    set_env_var("PG_RUNTIME_DIR", initial_runtime);
+    set_env_var("PG_DATA_DIR", initial_data);
+    set_env_var("PG_PASSWORD", initial_password);
 
     let base = unique_temp_dir();
     let runtime_dir = base.join("runtime");
@@ -142,57 +161,9 @@ fn set_pg_paths_sets_and_restores_env_vars_when_pre_set() {
         );
     }
 
-    assert_eq!(
-        env::var("PG_RUNTIME_DIR").unwrap_or_else(|err| panic!("PG_RUNTIME_DIR restored: {err}")),
-        "pre_existing_runtime"
-    );
-    assert_eq!(
-        env::var("PG_DATA_DIR").unwrap_or_else(|err| panic!("PG_DATA_DIR restored: {err}")),
-        "pre_existing_data"
-    );
-    assert_eq!(
-        env::var("PG_PASSWORD").unwrap_or_else(|err| panic!("PG_PASSWORD restored: {err}")),
-        "pre_existing_password"
-    );
-
-    remove_temp_dir(&base);
-}
-
-#[test]
-fn set_pg_paths_sets_and_restores_env_vars_when_unset() {
-    let _lock = test_lock();
-    let _restore = EnvRestore::capture();
-    unsafe {
-        env::remove_var("PG_RUNTIME_DIR");
-        env::remove_var("PG_DATA_DIR");
-        env::remove_var("PG_PASSWORD");
-    }
-
-    let base = unique_temp_dir();
-    let runtime_dir = base.join("runtime");
-    let data_dir = base.join("data");
-
-    {
-        let _guard = test_helpers::EnvVarGuard::set_pg_paths(&runtime_dir, &data_dir);
-
-        assert_eq!(
-            env::var_os("PG_RUNTIME_DIR"),
-            Some(runtime_dir.clone().into_os_string())
-        );
-        assert_eq!(
-            env::var_os("PG_DATA_DIR"),
-            Some(data_dir.clone().into_os_string())
-        );
-        assert_eq!(
-            env::var("PG_PASSWORD")
-                .unwrap_or_else(|err| panic!("PG_PASSWORD should be set: {err}")),
-            test_helpers::TEST_PG_PASSWORD
-        );
-    }
-
-    assert!(env::var_os("PG_RUNTIME_DIR").is_none());
-    assert!(env::var_os("PG_DATA_DIR").is_none());
-    assert!(env::var_os("PG_PASSWORD").is_none());
+    assert_env_var("PG_RUNTIME_DIR", initial_runtime);
+    assert_env_var("PG_DATA_DIR", initial_data);
+    assert_env_var("PG_PASSWORD", initial_password);
 
     remove_temp_dir(&base);
 }

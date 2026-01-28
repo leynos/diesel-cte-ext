@@ -556,6 +556,7 @@ dependencies = [
  "diesel-async",
  "pg-embed-setup-unpriv",
  "rstest 0.21.0",
+ "serde_json",
  "tokio",
 ]
 
