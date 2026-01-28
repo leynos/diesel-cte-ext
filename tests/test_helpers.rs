@@ -12,7 +12,10 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-const TEST_PG_PASSWORD: &str = "postgres_pass";
+use pg_embedded_setup_unpriv::{ExecutionPrivileges, detect_execution_privileges};
+
+/// Password used by embedded Postgres tests.
+pub const TEST_PG_PASSWORD: &str = "postgres_pass";
 
 fn env_mutex() -> &'static Mutex<()> {
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -27,11 +30,13 @@ fn reset_data_dir(data_dir: &Path) {
 
 fn reset_pgpass(runtime_dir: &Path) {
     let pgpass = runtime_dir.join(".pgpass");
-    match fs::remove_file(&pgpass) {
-        Ok(()) => {}
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => panic!("pgpass cleanup: {err}"),
+    if let Err(err) = fs::remove_file(&pgpass) {
+        assert!(is_not_found(&err), "pgpass cleanup: {err}");
     }
+}
+
+fn is_not_found(err: &std::io::Error) -> bool {
+    err.kind() == std::io::ErrorKind::NotFound
 }
 
 fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
@@ -51,12 +56,20 @@ fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
     fs::create_dir_all(&base_dir).unwrap_or_else(|err| panic!("base directory: {err}"));
     #[cfg(unix)]
     {
+        // Keep base directories writable when running as root so the worker
+        // process can initialise Postgres under a different user.
+        let desired_mode = match detect_execution_privileges() {
+            ExecutionPrivileges::Root => 0o777,
+            ExecutionPrivileges::Unprivileged => 0o700,
+        };
         let mut perms = fs::metadata(&base_dir)
             .unwrap_or_else(|err| panic!("base directory metadata: {err}"))
             .permissions();
-        perms.set_mode(0o777);
-        fs::set_permissions(&base_dir, perms)
-            .unwrap_or_else(|err| panic!("base directory permissions: {err}"));
+        if perms.mode() != desired_mode {
+            perms.set_mode(desired_mode);
+            fs::set_permissions(&base_dir, perms)
+                .unwrap_or_else(|err| panic!("base directory permissions: {err}"));
+        }
     }
 }
 
@@ -69,23 +82,23 @@ pub struct EnvVarGuard {
 }
 
 impl EnvVarGuard {
-    /// Set `PG_RUNTIME_DIR` and `PG_DATA_DIR`, creating the backing directories first.
+    /// Set `PG_RUNTIME_DIR` and `PG_DATA_DIR`, ensuring clean backing paths.
     ///
     /// # Panics
     ///
     /// Panics if the directories cannot be created or if the environment lock is poisoned.
     #[must_use]
     pub fn set_pg_paths(runtime_dir: &Path, data_dir: &Path) -> Self {
-        reset_data_dir(data_dir);
-        ensure_pg_embed_base(runtime_dir, data_dir);
-        reset_pgpass(runtime_dir);
-
         let lock = env_mutex()
             .lock()
             .unwrap_or_else(|err| panic!("env mutex poisoned: {err}"));
         let previous_runtime = env::var_os("PG_RUNTIME_DIR");
         let previous_data = env::var_os("PG_DATA_DIR");
         let previous_password = env::var_os("PG_PASSWORD");
+
+        reset_data_dir(data_dir);
+        ensure_pg_embed_base(runtime_dir, data_dir);
+        reset_pgpass(runtime_dir);
 
         unsafe {
             env::set_var("PG_RUNTIME_DIR", runtime_dir);

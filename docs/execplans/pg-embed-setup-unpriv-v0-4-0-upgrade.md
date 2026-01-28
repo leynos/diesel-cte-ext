@@ -27,7 +27,7 @@ supporting documentation while ensuring the standard quality gates pass.
 - `Cargo.lock`
 - `tests/test_helpers.rs`
 - `tests/postgres_recursive.rs`
-- `docs/pg-embedded-setup-unpriv-users-guide.md` (if behaviour changes warrant
+- `docs/pg-embed-setup-unpriv-users-guide.md` (if behaviour changes warrant
   an update)
 - `README.md` (if the testing workflow description needs adjustment)
 
@@ -48,7 +48,7 @@ supporting documentation while ensuring the standard quality gates pass.
     `ensure_template_exists` and any required setup/migrations.
   - Create a per-test `TemporaryDatabase` via
     `temporary_database_from_template`, returning its URL/connection handle to
-    tests and allowing RAII cleanup.
+    tests and allowing Resource Acquisition Is Initialisation (RAII) cleanup.
 - [ ] Update `tests/postgres_recursive.rs` to use the templated database URL (or
     Diesel connection) instead of `database_url("postgres")`.
 - [ ] Update documentation that references the test harness if the connection or
@@ -64,7 +64,7 @@ supporting documentation while ensuring the standard quality gates pass.
 - `make check-fmt`
 - `make lint`
 - `make test`
-- If docs change: `make markdownlint`, `make nixie`, `make fmt`.
+- If docs change: `make markdownlint`, `make nixie`, and `make fmt`.
 
 ## Risks and edge cases
 
@@ -77,7 +77,7 @@ supporting documentation while ensuring the standard quality gates pass.
 
 ## Open questions
 
-- Do we need to seed the template with schema/migrations, or is an empty
+- Is it necessary to seed the template with schema/migrations, or is an empty
   template sufficient for current tests?
 - Should the cluster fixture scope be broadened to make templating pay off, or
   keep per-test clusters and use templating purely for isolation?

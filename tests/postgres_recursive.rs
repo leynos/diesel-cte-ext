@@ -15,6 +15,7 @@ use pg_embedded_setup_unpriv::{
     detect_execution_privileges,
 };
 use rstest::{fixture, rstest};
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -23,10 +24,15 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
 
 const TEMPLATE_DB_NAME: &str = "cte_ext_template";
-const PG_EMBED_SETUP_UNPRIV_VERSION: &str = "0.4.0";
 static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static WORKER_SETUP: OnceLock<()> = OnceLock::new();
 static WORKER_MANIFEST: OnceLock<PathBuf> = OnceLock::new();
+static WORKER_VERSION: OnceLock<String> = OnceLock::new();
+
+struct WorkerProfile {
+    cargo_profile: String,
+    target_dir: String,
+}
 
 fn configure_pg_embed_env() -> test_helpers::EnvVarGuard {
     use std::path::PathBuf;
@@ -46,24 +52,79 @@ fn target_dir() -> PathBuf {
     )
 }
 
-fn pg_worker_path() -> PathBuf {
+fn worker_profile() -> WorkerProfile {
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_owned());
-    target_dir().join(profile).join("pg_worker")
+    match profile.as_str() {
+        "debug" => WorkerProfile {
+            cargo_profile: "dev".to_owned(),
+            target_dir: "debug".to_owned(),
+        },
+        "release" => WorkerProfile {
+            cargo_profile: "release".to_owned(),
+            target_dir: "release".to_owned(),
+        },
+        other => WorkerProfile {
+            cargo_profile: other.to_owned(),
+            target_dir: other.to_owned(),
+        },
+    }
+}
+
+fn pg_worker_path(profile: &WorkerProfile) -> PathBuf {
+    target_dir().join(&profile.target_dir).join("pg_worker")
+}
+
+fn cargo_lock_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock")
+}
+
+fn pg_embed_setup_unpriv_version() -> String {
+    WORKER_VERSION
+        .get_or_init(|| {
+            let lock_path = cargo_lock_path();
+            let contents = fs::read_to_string(&lock_path).unwrap_or_else(|err| {
+                panic!(
+                    "failed to read Cargo.lock at {}: {err}",
+                    lock_path.display()
+                )
+            });
+            parse_cargo_lock_version(&contents, "pg-embed-setup-unpriv").unwrap_or_else(|| {
+                panic!("pg-embed-setup-unpriv not found in {}", lock_path.display())
+            })
+        })
+        .clone()
+}
+
+fn parse_cargo_lock_version(contents: &str, crate_name: &str) -> Option<String> {
+    let mut is_target = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[[package]]" {
+            is_target = false;
+            continue;
+        }
+        if let Some(name) = trimmed.strip_prefix("name = \"") {
+            is_target = name.trim_end_matches('"') == crate_name;
+            continue;
+        }
+        if is_target && let Some(version) = trimmed.strip_prefix("version = \"") {
+            return Some(version.trim_end_matches('"').to_owned());
+        }
+    }
+    None
 }
 
 fn pg_embed_manifest_path() -> PathBuf {
     WORKER_MANIFEST
         .get_or_init(|| {
-            let cargo_home = std::env::var_os("CARGO_HOME").map_or_else(
-                || {
-                    let home = std::env::var_os("HOME")
-                        .map_or_else(|| PathBuf::from("/root"), PathBuf::from);
-                    home.join(".cargo")
-                },
-                PathBuf::from,
-            );
+            let cargo_home = std::env::var_os("CARGO_HOME")
+                .map(PathBuf::from)
+                .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cargo")))
+                .unwrap_or_else(|| {
+                    panic!("CARGO_HOME or HOME must be set to locate the Cargo registry")
+                });
             let src_dir = cargo_home.join("registry").join("src");
-            let crate_dir = format!("pg-embed-setup-unpriv-{PG_EMBED_SETUP_UNPRIV_VERSION}");
+            let crate_dir = format!("pg-embed-setup-unpriv-{}", pg_embed_setup_unpriv_version());
             let entries = std::fs::read_dir(&src_dir)
                 .unwrap_or_else(|err| panic!("failed to read cargo registry: {err}"));
             for entry in entries.flatten() {
@@ -82,7 +143,8 @@ fn pg_embed_manifest_path() -> PathBuf {
 
 fn ensure_worker_binary() {
     WORKER_SETUP.get_or_init(|| {
-        let worker_path = pg_worker_path();
+        let profile = worker_profile();
+        let worker_path = pg_worker_path(&profile);
         if worker_path.is_file() {
             return;
         }
@@ -95,6 +157,8 @@ fn ensure_worker_binary() {
             .arg(&manifest_path)
             .arg("--bin")
             .arg("pg_worker")
+            .arg("--profile")
+            .arg(&profile.cargo_profile)
             .arg("--target-dir")
             .arg(&target_dir)
             .status()
