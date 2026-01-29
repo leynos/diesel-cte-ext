@@ -15,7 +15,7 @@ use pg_embedded_setup_unpriv::{
     detect_execution_privileges,
 };
 use rstest::{fixture, rstest};
-use serde::Deserialize;
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -33,18 +33,6 @@ static WORKER_VERSION: OnceLock<String> = OnceLock::new();
 struct WorkerProfile {
     cargo_profile: String,
     target_dir: String,
-}
-
-#[derive(Deserialize)]
-struct CargoMetadata {
-    packages: Vec<CargoPackage>,
-}
-
-#[derive(Deserialize)]
-struct CargoPackage {
-    name: String,
-    version: String,
-    manifest_path: PathBuf,
 }
 
 fn configure_pg_embed_env() -> test_helpers::EnvVarGuard {
@@ -129,30 +117,15 @@ fn parse_cargo_lock_version(contents: &str, crate_name: &str) -> Option<String> 
 
 fn pg_embed_manifest_path() -> PathBuf {
     WORKER_MANIFEST
-        .get_or_init(|| find_pg_embed_manifest_path(&pg_embed_setup_unpriv_version()))
+        .get_or_init(|| {
+            let metadata = fetch_cargo_metadata();
+            find_pg_embed_manifest(&metadata, &pg_embed_setup_unpriv_version())
+        })
         .clone()
 }
 
-fn find_pg_embed_manifest_path(expected_version: &str) -> PathBuf {
-    let metadata = cargo_metadata();
-    metadata
-        .packages
-        .iter()
-        .filter(|package| package.name == "pg-embed-setup-unpriv")
-        .find(|package| package.version == expected_version)
-        .or_else(|| {
-            metadata
-                .packages
-                .iter()
-                .find(|package| package.name == "pg-embed-setup-unpriv")
-        })
-        .map_or_else(
-            || panic!("pg-embed-setup-unpriv not found in cargo metadata packages"),
-            |package| package.manifest_path.clone(),
-        )
-}
-
-fn cargo_metadata() -> CargoMetadata {
+/// Fetch and parse cargo metadata for the workspace.
+fn fetch_cargo_metadata() -> Value {
     let output = Command::new("cargo")
         .arg("metadata")
         .arg("--format-version")
@@ -167,6 +140,42 @@ fn cargo_metadata() -> CargoMetadata {
     );
     serde_json::from_slice(&output.stdout)
         .unwrap_or_else(|err| panic!("failed to parse cargo metadata output: {err}"))
+}
+
+/// Locate the pg-embed-setup-unpriv manifest in cargo metadata.
+fn find_pg_embed_manifest(metadata: &Value, desired_version: &str) -> PathBuf {
+    metadata
+        .get("packages")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|package| {
+            package.get("name").and_then(Value::as_str) == Some("pg-embed-setup-unpriv")
+        })
+        .find(|package| package.get("version").and_then(Value::as_str) == Some(desired_version))
+        .or_else(|| {
+            metadata
+                .get("packages")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .find(|package| {
+                    package.get("name").and_then(Value::as_str) == Some("pg-embed-setup-unpriv")
+                })
+        })
+        .map(|package| {
+            package
+                .get("manifest_path")
+                .and_then(Value::as_str)
+                .map_or_else(
+                    || panic!("pg-embed-setup-unpriv manifest_path missing in metadata"),
+                    PathBuf::from,
+                )
+        })
+        .map_or_else(
+            || panic!("pg-embed-setup-unpriv not found in cargo metadata packages"),
+            |path| path,
+        )
 }
 
 fn ensure_worker_binary() {
