@@ -15,7 +15,7 @@ use pg_embedded_setup_unpriv::{
     detect_execution_privileges,
 };
 use rstest::{fixture, rstest};
-use serde_json::Value;
+use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -33,6 +33,18 @@ static WORKER_VERSION: OnceLock<String> = OnceLock::new();
 struct WorkerProfile {
     cargo_profile: String,
     target_dir: String,
+}
+
+#[derive(Deserialize)]
+struct CargoMetadata {
+    packages: Vec<CargoPackage>,
+}
+
+#[derive(Deserialize)]
+struct CargoPackage {
+    name: String,
+    version: String,
+    manifest_path: PathBuf,
 }
 
 fn configure_pg_embed_env() -> test_helpers::EnvVarGuard {
@@ -97,72 +109,64 @@ fn pg_embed_setup_unpriv_version() -> String {
 }
 
 fn parse_cargo_lock_version(contents: &str, crate_name: &str) -> Option<String> {
-    let mut is_target = false;
-    for line in contents.lines() {
-        let trimmed = line.trim();
-        if trimmed == "[[package]]" {
-            is_target = false;
-            continue;
-        }
-        if let Some(name) = trimmed.strip_prefix("name = \"") {
-            is_target = name.trim_end_matches('"') == crate_name;
-            continue;
-        }
-        if is_target && let Some(version) = trimmed.strip_prefix("version = \"") {
-            return Some(version.trim_end_matches('"').to_owned());
-        }
-    }
-    None
+    let lockfile: toml::Value =
+        toml::from_str(contents).unwrap_or_else(|err| panic!("failed to parse Cargo.lock: {err}"));
+    lockfile
+        .get("package")
+        .and_then(|packages| packages.as_array())
+        .and_then(|packages| {
+            packages.iter().find_map(|package| {
+                let name = package.get("name")?.as_str()?;
+                let version = package.get("version")?.as_str()?;
+                if name == crate_name {
+                    Some(version.to_owned())
+                } else {
+                    None
+                }
+            })
+        })
 }
 
 fn pg_embed_manifest_path() -> PathBuf {
     WORKER_MANIFEST
-        .get_or_init(|| {
-            let output = Command::new("cargo")
-                .arg("metadata")
-                .arg("--format-version")
-                .arg("1")
-                .arg("--locked")
-                .output()
-                .unwrap_or_else(|err| panic!("failed to run cargo metadata: {err}"));
-            assert!(
-                output.status.success(),
-                "cargo metadata failed with status {}",
-                output.status
-            );
-            let metadata: Value = serde_json::from_slice(&output.stdout)
-                .unwrap_or_else(|err| panic!("failed to parse cargo metadata output: {err}"));
-            let packages = metadata
-                .get("packages")
-                .and_then(Value::as_array)
-                .unwrap_or_else(|| panic!("cargo metadata output missing packages"));
-            let desired_version = pg_embed_setup_unpriv_version();
-            let mut fallback_manifest = None;
-            for package in packages {
-                let name = package.get("name").and_then(Value::as_str);
-                if name != Some("pg-embed-setup-unpriv") {
-                    continue;
-                }
-                let manifest_path = package
-                    .get("manifest_path")
-                    .and_then(Value::as_str)
-                    .map_or_else(
-                        || panic!("pg-embed-setup-unpriv manifest_path missing in metadata"),
-                        PathBuf::from,
-                    );
-                let version = package.get("version").and_then(Value::as_str);
-                if version == Some(desired_version.as_str()) {
-                    return manifest_path;
-                }
-                if fallback_manifest.is_none() {
-                    fallback_manifest = Some(manifest_path);
-                }
-            }
-            fallback_manifest.unwrap_or_else(|| {
-                panic!("pg-embed-setup-unpriv not found in cargo metadata packages")
-            })
-        })
+        .get_or_init(|| find_pg_embed_manifest_path(&pg_embed_setup_unpriv_version()))
         .clone()
+}
+
+fn find_pg_embed_manifest_path(expected_version: &str) -> PathBuf {
+    let metadata = cargo_metadata();
+    metadata
+        .packages
+        .iter()
+        .filter(|package| package.name == "pg-embed-setup-unpriv")
+        .find(|package| package.version == expected_version)
+        .or_else(|| {
+            metadata
+                .packages
+                .iter()
+                .find(|package| package.name == "pg-embed-setup-unpriv")
+        })
+        .map_or_else(
+            || panic!("pg-embed-setup-unpriv not found in cargo metadata packages"),
+            |package| package.manifest_path.clone(),
+        )
+}
+
+fn cargo_metadata() -> CargoMetadata {
+    let output = Command::new("cargo")
+        .arg("metadata")
+        .arg("--format-version")
+        .arg("1")
+        .arg("--locked")
+        .output()
+        .unwrap_or_else(|err| panic!("failed to run cargo metadata: {err}"));
+    assert!(
+        output.status.success(),
+        "cargo metadata failed with status {}",
+        output.status
+    );
+    serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|err| panic!("failed to parse cargo metadata output: {err}"))
 }
 
 fn ensure_worker_binary() {

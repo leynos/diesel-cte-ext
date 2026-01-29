@@ -57,7 +57,7 @@ fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
     #[cfg(unix)]
     {
         // Keep base directories writable when running as root so the worker
-        // process can initialise Postgres under a different user.
+        // process can initialize Postgres under a different user.
         let desired_mode = match detect_execution_privileges() {
             ExecutionPrivileges::Root => 0o777,
             ExecutionPrivileges::Unprivileged => 0o700,
@@ -95,6 +95,9 @@ impl EnvVarGuard {
     /// # Panics
     ///
     /// Panics if the directories cannot be created or if the environment lock is poisoned.
+    ///
+    /// Coverage for env var restoration and filesystem cleanup lives in
+    /// `tests/env_var_guard.rs`.
     #[must_use]
     pub fn set_pg_paths(runtime_dir: &Path, data_dir: &Path) -> Self {
         let lock = env_mutex()
