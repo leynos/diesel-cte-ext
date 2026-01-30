@@ -205,6 +205,8 @@ impl EnvVarGuard {
     /// Panics if the directories cannot be created.
     ///
     /// Callers must hold the env mutex via `env_lock_guard` or `with_env_lock`.
+    /// The returned guard must be dropped before releasing the external lock to
+    /// avoid concurrent environment mutations.
     #[must_use]
     pub fn set_pg_paths_locked(
         _lock: &MutexGuard<'static, ()>,
@@ -232,6 +234,7 @@ mod with_env_lock_tests {
     use std::env;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -311,16 +314,19 @@ mod with_env_lock_tests {
     }
 
     fn temp_dir(suffix: &str) -> PathBuf {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_else(|err| panic!("system time: {err}"))
             .as_nanos();
+        let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
         let mut path = env::temp_dir();
         path.push(format!(
-            "diesel_cte_ext_test_helpers_{}_{}_{}",
+            "diesel_cte_ext_test_helpers_{}_{}_{}_{}",
             suffix,
             std::process::id(),
-            nanos
+            nanos,
+            counter
         ));
         path
     }
