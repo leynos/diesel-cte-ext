@@ -274,11 +274,11 @@ mod with_env_lock_tests {
         let guard = guard_constructor(&runtime, &data);
         assert_eq!(
             env::var_os("PG_RUNTIME_DIR"),
-            Some(runtime.clone().into_os_string())
+            Some(runtime.as_os_str().to_os_string())
         );
         assert_eq!(
             env::var_os("PG_DATA_DIR"),
-            Some(data.clone().into_os_string())
+            Some(data.as_os_str().to_os_string())
         );
         drop(guard);
         remove_dir_all(&base);
