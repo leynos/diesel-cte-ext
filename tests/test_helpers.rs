@@ -231,9 +231,11 @@ mod with_env_lock_tests {
         EnvVarGuard, env_lock_guard, restore_env_var, restore_env_var_locked, set_env_var,
         set_env_var_locked, with_env_lock,
     };
+    use rstest::rstest;
     use std::env;
+    use std::ffi::OsString;
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -243,66 +245,79 @@ mod with_env_lock_tests {
         assert_eq!(value, 42);
     }
 
-    #[test]
-    fn set_env_var_updates_value() {
-        let name = "DIESEL_CTE_EXT_TEST_HELPERS_TMP";
+    /// Verify that an env-var setter and restorer update the same key.
+    fn test_env_var_setter<F, R>(name: &str, setter: F, restorer: R)
+    where
+        F: FnOnce(Option<&str>),
+        R: FnOnce(Option<&OsString>),
+    {
         let previous = env::var_os(name);
 
-        set_env_var(name, Some("value"));
+        setter(Some("value"));
         assert_eq!(
             env::var(name).unwrap_or_else(|err| panic!("{name} should be set: {err}")),
             "value"
         );
 
-        restore_env_var(name, previous.as_ref());
+        restorer(previous.as_ref());
     }
 
-    #[test]
-    fn set_env_var_locked_updates_value() {
-        let name = "DIESEL_CTE_EXT_TEST_HELPERS_LOCKED_TMP";
-        let lock = env_lock_guard();
-        let previous = env::var_os(name);
-
-        set_env_var_locked(&lock, name, Some("value"));
-        assert_eq!(
-            env::var(name).unwrap_or_else(|err| panic!("{name} should be set: {err}")),
-            "value"
-        );
-
-        restore_env_var_locked(&lock, name, previous.as_ref());
-    }
-
-    #[test]
-    fn env_var_guard_sets_paths_locked() {
-        let lock = env_lock_guard();
-        let base = temp_dir("locked");
+    /// Exercise a guard constructor and assert it sets the pg-embed env vars.
+    fn test_path_guard<F>(suffix: &str, guard_constructor: F)
+    where
+        F: FnOnce(&Path, &Path) -> EnvVarGuard,
+    {
+        let base = temp_dir(suffix);
         let runtime = base.join("runtime");
         let data = base.join("data");
 
-        let guard = EnvVarGuard::set_pg_paths_locked(&lock, &runtime, &data);
+        let guard = guard_constructor(&runtime, &data);
         assert_eq!(
             env::var_os("PG_RUNTIME_DIR"),
-            Some(runtime.into_os_string())
+            Some(runtime.clone().into_os_string())
         );
-        assert_eq!(env::var_os("PG_DATA_DIR"), Some(data.into_os_string()));
+        assert_eq!(
+            env::var_os("PG_DATA_DIR"),
+            Some(data.clone().into_os_string())
+        );
         drop(guard);
         remove_dir_all(&base);
     }
 
-    #[test]
-    fn env_var_guard_sets_paths() {
-        let base = temp_dir("unlocked");
-        let runtime = base.join("runtime");
-        let data = base.join("data");
+    #[rstest]
+    #[case::set_env_var_updates_value(false)]
+    #[case::set_env_var_locked_updates_value(true)]
+    fn env_var_setters_update_value(#[case] locked: bool) {
+        if locked {
+            let name = "DIESEL_CTE_EXT_TEST_HELPERS_LOCKED_TMP";
+            let lock = env_lock_guard();
+            test_env_var_setter(
+                name,
+                |value| set_env_var_locked(&lock, name, value),
+                |value| restore_env_var_locked(&lock, name, value),
+            );
+        } else {
+            let name = "DIESEL_CTE_EXT_TEST_HELPERS_TMP";
+            test_env_var_setter(
+                name,
+                |value| set_env_var(name, value),
+                |value| restore_env_var(name, value),
+            );
+        }
+    }
 
-        let guard = EnvVarGuard::set_pg_paths(&runtime, &data);
-        assert_eq!(
-            env::var_os("PG_RUNTIME_DIR"),
-            Some(runtime.into_os_string())
-        );
-        assert_eq!(env::var_os("PG_DATA_DIR"), Some(data.into_os_string()));
-        drop(guard);
-        remove_dir_all(&base);
+    #[rstest]
+    #[case::env_var_guard_sets_paths(false, "unlocked")]
+    #[case::env_var_guard_sets_paths_locked(true, "locked")]
+    fn env_var_guard_sets_paths_cases(#[case] locked: bool, #[case] suffix: &str) {
+        if locked {
+            let lock = env_lock_guard();
+            test_path_guard(suffix, |runtime, data| {
+                EnvVarGuard::set_pg_paths_locked(&lock, runtime, data)
+            });
+        } else {
+            test_path_guard(suffix, EnvVarGuard::set_pg_paths);
+        }
     }
 
     fn remove_dir_all(path: &PathBuf) {
