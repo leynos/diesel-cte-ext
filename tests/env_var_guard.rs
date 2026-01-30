@@ -8,57 +8,46 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rstest::{fixture, rstest};
 
 static TEMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-fn test_lock() -> MutexGuard<'static, ()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(|err| panic!("env var guard test mutex: {err}"))
-}
-
 struct EnvTestGuard {
-    _lock: MutexGuard<'static, ()>,
-    _restore: EnvRestore,
-}
-
-struct EnvRestore {
+    lock: std::sync::MutexGuard<'static, ()>,
     runtime: Option<OsString>,
     data: Option<OsString>,
     password: Option<OsString>,
 }
 
-impl EnvRestore {
+impl EnvTestGuard {
     fn capture() -> Self {
+        let lock = test_helpers::env_lock_guard();
         Self {
             runtime: env::var_os("PG_RUNTIME_DIR"),
             data: env::var_os("PG_DATA_DIR"),
             password: env::var_os("PG_PASSWORD"),
+            lock,
         }
+    }
+
+    const fn lock(&self) -> &std::sync::MutexGuard<'static, ()> {
+        &self.lock
     }
 }
 
-impl Drop for EnvRestore {
+impl Drop for EnvTestGuard {
     fn drop(&mut self) {
-        test_helpers::with_env_lock(|| {
-            restore_env_var("PG_RUNTIME_DIR", self.runtime.as_ref());
-            restore_env_var("PG_DATA_DIR", self.data.as_ref());
-            restore_env_var("PG_PASSWORD", self.password.as_ref());
-        });
+        test_helpers::restore_env_var_locked(self.lock(), "PG_RUNTIME_DIR", self.runtime.as_ref());
+        test_helpers::restore_env_var_locked(self.lock(), "PG_DATA_DIR", self.data.as_ref());
+        test_helpers::restore_env_var_locked(self.lock(), "PG_PASSWORD", self.password.as_ref());
     }
 }
 
 #[fixture]
 fn env_setup() -> EnvTestGuard {
-    EnvTestGuard {
-        _lock: test_lock(),
-        _restore: EnvRestore::capture(),
-    }
+    EnvTestGuard::capture()
 }
 
 fn unique_temp_dir() -> PathBuf {
@@ -84,20 +73,6 @@ fn remove_temp_dir(path: &Path) {
     }
 }
 
-fn restore_env_var(name: &str, value: Option<&OsString>) {
-    match value {
-        Some(stored) => unsafe { env::set_var(name, stored) },
-        None => unsafe { env::remove_var(name) },
-    }
-}
-
-fn set_env_var(name: &str, new_value: Option<&str>) {
-    test_helpers::with_env_lock(|| match new_value {
-        Some(value) => unsafe { env::set_var(name, value) },
-        None => unsafe { env::remove_var(name) },
-    });
-}
-
 fn assert_env_var(name: &str, expected_value: Option<&str>) {
     match expected_value {
         Some(expected) => {
@@ -113,7 +88,7 @@ fn assert_env_var(name: &str, expected_value: Option<&str>) {
 
 #[rstest]
 fn set_pg_paths_resets_data_dir_and_pgpass(env_setup: EnvTestGuard) {
-    let _ = &env_setup;
+    let env_lock = env_setup.lock();
     let base = unique_temp_dir();
     let runtime_dir = base.join("runtime");
     let data_dir = base.join("data");
@@ -126,7 +101,8 @@ fn set_pg_paths_resets_data_dir_and_pgpass(env_setup: EnvTestGuard) {
     fs::write(&junk, "old data").unwrap_or_else(|err| panic!("write junk: {err}"));
 
     {
-        let _guard = test_helpers::EnvVarGuard::set_pg_paths(&runtime_dir, &data_dir);
+        let _guard =
+            test_helpers::EnvVarGuard::set_pg_paths_locked(env_lock, &runtime_dir, &data_dir);
 
         assert!(base.exists(), "base directory should exist");
         assert!(
@@ -155,17 +131,18 @@ fn set_pg_paths_sets_and_restores_env_vars(
     #[case] initial_data: Option<&'static str>,
     #[case] initial_password: Option<&'static str>,
 ) {
-    let _ = &env_setup;
-    set_env_var("PG_RUNTIME_DIR", initial_runtime);
-    set_env_var("PG_DATA_DIR", initial_data);
-    set_env_var("PG_PASSWORD", initial_password);
+    let env_lock = env_setup.lock();
+    test_helpers::set_env_var_locked(env_lock, "PG_RUNTIME_DIR", initial_runtime);
+    test_helpers::set_env_var_locked(env_lock, "PG_DATA_DIR", initial_data);
+    test_helpers::set_env_var_locked(env_lock, "PG_PASSWORD", initial_password);
 
     let base = unique_temp_dir();
     let runtime_dir = base.join("runtime");
     let data_dir = base.join("data");
 
     {
-        let _guard = test_helpers::EnvVarGuard::set_pg_paths(&runtime_dir, &data_dir);
+        let _guard =
+            test_helpers::EnvVarGuard::set_pg_paths_locked(env_lock, &runtime_dir, &data_dir);
 
         assert_eq!(
             env::var_os("PG_RUNTIME_DIR"),
@@ -191,16 +168,16 @@ fn set_pg_paths_sets_and_restores_env_vars(
 
 #[rstest]
 fn set_pg_paths_allows_sequential_guards(env_setup: EnvTestGuard) {
-    let _ = &env_setup;
-    set_env_var("PG_RUNTIME_DIR", Some("baseline_runtime"));
-    set_env_var("PG_DATA_DIR", Some("baseline_data"));
-    set_env_var("PG_PASSWORD", Some("baseline_password"));
+    let env_lock = env_setup.lock();
+    test_helpers::set_env_var_locked(env_lock, "PG_RUNTIME_DIR", Some("baseline_runtime"));
+    test_helpers::set_env_var_locked(env_lock, "PG_DATA_DIR", Some("baseline_data"));
+    test_helpers::set_env_var_locked(env_lock, "PG_PASSWORD", Some("baseline_password"));
 
     let base1 = unique_temp_dir();
     let runtime1 = base1.join("runtime1");
     let data1 = base1.join("data1");
     {
-        let _guard = test_helpers::EnvVarGuard::set_pg_paths(&runtime1, &data1);
+        let _guard = test_helpers::EnvVarGuard::set_pg_paths_locked(env_lock, &runtime1, &data1);
         assert_eq!(
             env::var_os("PG_RUNTIME_DIR"),
             Some(runtime1.clone().into_os_string())
@@ -215,7 +192,7 @@ fn set_pg_paths_allows_sequential_guards(env_setup: EnvTestGuard) {
     let runtime2 = base2.join("runtime2");
     let data2 = base2.join("data2");
     {
-        let _guard = test_helpers::EnvVarGuard::set_pg_paths(&runtime2, &data2);
+        let _guard = test_helpers::EnvVarGuard::set_pg_paths_locked(env_lock, &runtime2, &data2);
         assert_eq!(
             env::var_os("PG_RUNTIME_DIR"),
             Some(runtime2.clone().into_os_string())
