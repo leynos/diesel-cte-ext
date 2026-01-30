@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 static TEMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,6 +20,11 @@ fn test_lock() -> MutexGuard<'static, ()> {
     LOCK.get_or_init(|| Mutex::new(()))
         .lock()
         .unwrap_or_else(|err| panic!("env var guard test mutex: {err}"))
+}
+
+struct EnvTestGuard {
+    _lock: MutexGuard<'static, ()>,
+    _restore: EnvRestore,
 }
 
 struct EnvRestore {
@@ -45,6 +50,14 @@ impl Drop for EnvRestore {
             restore_env_var("PG_DATA_DIR", self.data.as_ref());
             restore_env_var("PG_PASSWORD", self.password.as_ref());
         });
+    }
+}
+
+#[fixture]
+fn env_setup() -> EnvTestGuard {
+    EnvTestGuard {
+        _lock: test_lock(),
+        _restore: EnvRestore::capture(),
     }
 }
 
@@ -98,10 +111,9 @@ fn assert_env_var(name: &str, expected_value: Option<&str>) {
     }
 }
 
-#[test]
-fn set_pg_paths_resets_data_dir_and_pgpass() {
-    let _lock = test_lock();
-    let _restore = EnvRestore::capture();
+#[rstest]
+fn set_pg_paths_resets_data_dir_and_pgpass(env_setup: EnvTestGuard) {
+    let _ = &env_setup;
     let base = unique_temp_dir();
     let runtime_dir = base.join("runtime");
     let data_dir = base.join("data");
@@ -138,12 +150,12 @@ fn set_pg_paths_resets_data_dir_and_pgpass() {
 )]
 #[case::unset(None, None, None)]
 fn set_pg_paths_sets_and_restores_env_vars(
+    env_setup: EnvTestGuard,
     #[case] initial_runtime: Option<&'static str>,
     #[case] initial_data: Option<&'static str>,
     #[case] initial_password: Option<&'static str>,
 ) {
-    let _lock = test_lock();
-    let _restore = EnvRestore::capture();
+    let _ = &env_setup;
     set_env_var("PG_RUNTIME_DIR", initial_runtime);
     set_env_var("PG_DATA_DIR", initial_data);
     set_env_var("PG_PASSWORD", initial_password);
@@ -177,15 +189,12 @@ fn set_pg_paths_sets_and_restores_env_vars(
     remove_temp_dir(&base);
 }
 
-#[test]
-fn set_pg_paths_allows_sequential_guards() {
-    let _lock = test_lock();
-    let _restore = EnvRestore::capture();
-    unsafe {
-        env::set_var("PG_RUNTIME_DIR", "baseline_runtime");
-        env::set_var("PG_DATA_DIR", "baseline_data");
-        env::set_var("PG_PASSWORD", "baseline_password");
-    }
+#[rstest]
+fn set_pg_paths_allows_sequential_guards(env_setup: EnvTestGuard) {
+    let _ = &env_setup;
+    set_env_var("PG_RUNTIME_DIR", Some("baseline_runtime"));
+    set_env_var("PG_DATA_DIR", Some("baseline_data"));
+    set_env_var("PG_PASSWORD", Some("baseline_password"));
 
     let base1 = unique_temp_dir();
     let runtime1 = base1.join("runtime1");
