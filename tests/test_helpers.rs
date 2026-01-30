@@ -5,7 +5,6 @@ use std::{
     ffi::OsString,
     fs,
     path::Path,
-    path::PathBuf,
     sync::{Mutex, MutexGuard, OnceLock},
 };
 
@@ -65,12 +64,12 @@ fn is_not_found(err: &std::io::Error) -> bool {
 }
 
 fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
-    let base_dir = runtime_dir
-        .parent()
-        .map_or_else(|| runtime_dir.to_path_buf(), PathBuf::from);
-    let data_parent = data_dir
-        .parent()
-        .map_or_else(|| data_dir.to_path_buf(), PathBuf::from);
+    let base_dir_parent = runtime_dir.parent().map(Path::to_path_buf);
+    let base_dir_fallback = runtime_dir.to_path_buf();
+    let base_dir = base_dir_parent.unwrap_or(base_dir_fallback);
+    let data_parent_parent = data_dir.parent().map(Path::to_path_buf);
+    let data_parent_fallback = data_dir.to_path_buf();
+    let data_parent = data_parent_parent.unwrap_or(data_parent_fallback);
     assert!(
         base_dir == data_parent,
         "runtime/data directories must share the same parent: {} vs {}",
