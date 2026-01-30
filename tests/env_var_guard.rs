@@ -40,9 +40,11 @@ impl EnvRestore {
 
 impl Drop for EnvRestore {
     fn drop(&mut self) {
-        test_helpers::restore_env_var("PG_RUNTIME_DIR", self.runtime.as_ref());
-        test_helpers::restore_env_var("PG_DATA_DIR", self.data.as_ref());
-        test_helpers::restore_env_var("PG_PASSWORD", self.password.as_ref());
+        test_helpers::with_env_lock(|| {
+            restore_env_var("PG_RUNTIME_DIR", self.runtime.as_ref());
+            restore_env_var("PG_DATA_DIR", self.data.as_ref());
+            restore_env_var("PG_PASSWORD", self.password.as_ref());
+        });
     }
 }
 
@@ -69,11 +71,18 @@ fn remove_temp_dir(path: &Path) {
     }
 }
 
-fn set_env_var(name: &str, new_value: Option<&str>) {
-    match new_value {
-        Some(value) => unsafe { env::set_var(name, value) },
+fn restore_env_var(name: &str, value: Option<&OsString>) {
+    match value {
+        Some(stored) => unsafe { env::set_var(name, stored) },
         None => unsafe { env::remove_var(name) },
     }
+}
+
+fn set_env_var(name: &str, new_value: Option<&str>) {
+    test_helpers::with_env_lock(|| match new_value {
+        Some(value) => unsafe { env::set_var(name, value) },
+        None => unsafe { env::remove_var(name) },
+    });
 }
 
 fn assert_env_var(name: &str, expected_value: Option<&str>) {

@@ -22,6 +22,18 @@ fn env_mutex() -> &'static Mutex<()> {
     ENV_LOCK.get_or_init(|| Mutex::new(()))
 }
 
+/// Execute a closure while holding the shared environment mutex.
+///
+/// # Panics
+///
+/// Panics if the environment mutex is poisoned.
+pub fn with_env_lock<T>(f: impl FnOnce() -> T) -> T {
+    let _lock = env_mutex()
+        .lock()
+        .unwrap_or_else(|err| panic!("env mutex poisoned: {err}"));
+    f()
+}
+
 fn reset_data_dir(data_dir: &Path) {
     if data_dir.exists() {
         fs::remove_dir_all(data_dir).unwrap_or_else(|err| panic!("data directory cleanup: {err}"));
@@ -74,14 +86,14 @@ fn ensure_pg_embed_base(runtime_dir: &Path, data_dir: &Path) {
 }
 
 /// Restore an environment variable from a captured value.
-pub fn restore_env_var(name: &str, value: Option<&OsString>) {
+fn restore_env_var(name: &str, value: Option<&OsString>) {
     match value {
         Some(stored) => unsafe { env::set_var(name, stored) },
         None => unsafe { env::remove_var(name) },
     }
 }
 
-/// Serialises access to pg-embed environment variables and restores them on drop.
+/// Serializes access to pg-embed environment variables and restores them on drop.
 pub struct EnvVarGuard {
     _lock: MutexGuard<'static, ()>,
     previous_runtime: Option<OsString>,
@@ -131,5 +143,16 @@ impl Drop for EnvVarGuard {
         restore_env_var("PG_RUNTIME_DIR", self.previous_runtime.as_ref());
         restore_env_var("PG_DATA_DIR", self.previous_data.as_ref());
         restore_env_var("PG_PASSWORD", self.previous_password.as_ref());
+    }
+}
+
+#[cfg(test)]
+mod with_env_lock_tests {
+    use super::with_env_lock;
+
+    #[test]
+    fn with_env_lock_runs_closure() {
+        let value = with_env_lock(|| 42);
+        assert_eq!(value, 42);
     }
 }
