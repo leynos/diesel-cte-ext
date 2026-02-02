@@ -558,7 +558,7 @@ dependencies = [
  "rstest 0.21.0",
  "serde_json",
  "tokio",
- "toml 0.8.23",
+ "toml 0.9.8",
 ]
 
 [[package]]
