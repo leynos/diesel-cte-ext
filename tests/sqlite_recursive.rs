@@ -4,6 +4,7 @@
 
 use diesel::{Connection, dsl::sql, sql_types::Integer, sqlite::SqliteConnection};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
+use rstest::{fixture, rstest};
 
 #[test]
 fn sqlite_sync_recursive_sequence() {
@@ -24,21 +25,33 @@ fn sqlite_sync_recursive_sequence() {
     assert_eq!(rows, vec![1, 2, 3, 4]);
 }
 
-#[test]
-fn sqlite_graph_cycle_duplicate_behaviour() {
+#[fixture]
+fn graph_conn() -> SqliteConnection {
     use diesel::{RunQueryDsl, sql_query};
 
-    let mut conn = SqliteConnection::establish(":memory:").expect("in-memory sqlite");
-    sql_query("CREATE TABLE edges (source INTEGER NOT NULL, target INTEGER NOT NULL)")
-        .execute(&mut conn)
-        .expect("create edges table");
+    let mut conn = match SqliteConnection::establish(":memory:") {
+        Ok(conn) => conn,
+        Err(err) => panic!("in-memory sqlite: {err}"),
+    };
+    if let Err(err) =
+        sql_query("CREATE TABLE edges (source INTEGER NOT NULL, target INTEGER NOT NULL)")
+            .execute(&mut conn)
+    {
+        panic!("create edges table: {err}");
+    }
     sql_query("INSERT INTO edges (source, target) VALUES (1, 2), (1, 3), (2, 3), (3, 2), (2, 4)")
         .execute(&mut conn)
-        .expect("insert graph edges");
+        .unwrap_or_else(|err| panic!("insert graph edges: {err}"));
+    conn
+}
+
+#[rstest]
+fn sqlite_graph_cycle_duplicate_behaviour(mut graph_conn: SqliteConnection) {
+    use diesel::RunQueryDsl;
 
     // UNION ALL requires explicit cycle limiting for this graph; duplicate rows
     // can still emerge and then need DISTINCT in the final body query.
-    let union_all_rows: Vec<i32> = conn
+    let union_all_rows: Vec<i32> = graph_conn
         .with_recursive(
             "walk",
             &["node"],
@@ -53,11 +66,11 @@ fn sqlite_graph_cycle_duplicate_behaviour() {
                 sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load UNION ALL rows");
     assert_eq!(union_all_rows, vec![2, 3, 3, 4]);
 
-    let union_all_distinct_rows: Vec<i32> = conn
+    let union_all_distinct_rows: Vec<i32> = graph_conn
         .with_recursive(
             "walk",
             &["node"],
@@ -72,10 +85,10 @@ fn sqlite_graph_cycle_duplicate_behaviour() {
                 sql::<Integer>("SELECT DISTINCT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load DISTINCT UNION ALL rows");
 
-    let union_rows: Vec<i32> = conn
+    let union_rows: Vec<i32> = graph_conn
         .with_recursive_not_all(
             "walk",
             &["node"],
@@ -89,26 +102,18 @@ fn sqlite_graph_cycle_duplicate_behaviour() {
                 sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load UNION rows");
 
     assert_eq!(union_rows, vec![2, 3, 4]);
     assert_eq!(union_rows, union_all_distinct_rows);
 }
 
-#[test]
-fn sqlite_prepared_statement_cache_isolation_between_union_modes() {
-    use diesel::{RunQueryDsl, sql_query};
+#[rstest]
+fn sqlite_prepared_statement_cache_isolation_between_union_modes(mut graph_conn: SqliteConnection) {
+    use diesel::RunQueryDsl;
 
-    let mut conn = SqliteConnection::establish(":memory:").expect("in-memory sqlite");
-    sql_query("CREATE TABLE edges (source INTEGER NOT NULL, target INTEGER NOT NULL)")
-        .execute(&mut conn)
-        .expect("create edges table");
-    sql_query("INSERT INTO edges (source, target) VALUES (1, 2), (1, 3), (2, 3), (3, 2), (2, 4)")
-        .execute(&mut conn)
-        .expect("insert graph edges");
-
-    let first_union_all: Vec<i32> = conn
+    let first_union_all: Vec<i32> = graph_conn
         .with_recursive(
             "walk",
             &["node"],
@@ -123,10 +128,10 @@ fn sqlite_prepared_statement_cache_isolation_between_union_modes() {
                 sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load first UNION ALL rows");
 
-    let union_rows: Vec<i32> = conn
+    let union_rows: Vec<i32> = graph_conn
         .with_recursive_not_all(
             "walk",
             &["node"],
@@ -141,10 +146,10 @@ fn sqlite_prepared_statement_cache_isolation_between_union_modes() {
                 sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load UNION rows");
 
-    let second_union_all: Vec<i32> = conn
+    let second_union_all: Vec<i32> = graph_conn
         .with_recursive(
             "walk",
             &["node"],
@@ -159,7 +164,7 @@ fn sqlite_prepared_statement_cache_isolation_between_union_modes() {
                 sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
             ),
         )
-        .load(&mut conn)
+        .load(&mut graph_conn)
         .expect("load second UNION ALL rows");
 
     assert_eq!(first_union_all, vec![2, 3, 3, 4]);
