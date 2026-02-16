@@ -1,7 +1,8 @@
 //! Diesel extension crate providing support for recursive CTEs.
 //!
-//! The [`RecursiveCTEExt::with_recursive`] method builds a Diesel query
-//! representing a `WITH RECURSIVE` block that can be executed like any other
+//! The [`RecursiveCTEExt::with_recursive`] and
+//! [`RecursiveCTEExt::with_recursive_not_all`] methods build Diesel queries
+//! representing `WITH RECURSIVE` blocks that can be executed like any other
 //! query.
 
 pub mod builders;
@@ -21,6 +22,8 @@ pub use builders::with_cte;
 #[doc = "Legacy helper kept for backwards compatibility with 0.1.0 previews."]
 #[deprecated(note = "Use `RecursiveCTEExt::with_recursive` instead")]
 pub use builders::with_recursive;
+/// Builds a recursive `WITH RECURSIVE` block using `UNION`.
+pub use builders::with_recursive_not_all;
 /// Runtime column names paired with compile-time schema metadata.
 pub use columns::Columns;
 /// Extension trait exposing the `with_recursive` helper on Diesel connections.

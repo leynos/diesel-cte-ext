@@ -10,7 +10,8 @@ suites. Follow the documentation style guide in
 `diesel-cte-ext` adds two ergonomic layers on top of Diesel:
 
 - the `RecursiveCTEExt` trait, which exposes `with_cte` and `with_recursive`
-  constructors on synchronous and async connection types;
+  constructors on synchronous and async connection types, plus
+  `with_recursive_not_all` for recursive `UNION` behaviour;
 - the `Columns` utilities that keep runtime column names aligned with Diesel's
   compile-time type metadata.
 
@@ -71,6 +72,30 @@ fn up_to_five(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
             sql::<Integer>("SELECT 1"),
             sql::<Integer>("SELECT n + 1 FROM series WHERE n < 5"),
             sql::<Integer>("SELECT n FROM series"),
+        ),
+    )
+    .load(conn)
+}
+```
+
+`with_recursive` renders a recursive `UNION ALL`. Use `with_recursive_not_all`
+when the recursive term should deduplicate at each iteration using `UNION`.
+
+```rust,no_run
+use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
+use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
+
+fn reachable_nodes(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
+    conn.with_recursive_not_all(
+        "graph",
+        &["node_id"],
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>(concat!(
+                "SELECT edges.target_id FROM edges ",
+                "INNER JOIN graph ON edges.source_id = graph.node_id"
+            )),
+            sql::<Integer>("SELECT node_id FROM graph ORDER BY node_id"),
         ),
     )
     .load(conn)
