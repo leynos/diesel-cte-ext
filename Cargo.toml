@@ -1,10 +1,15 @@
 [package]
 name = "diesel-cte-ext"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Common Table Expressions for Diesel"
 readme = "README.md"
 license = "ISC"
+authors = ["Payton McIntosh <pmcintosh@df12.net>"]
+homepage = "https://df12.studio/docs.html"
+repository = "https://github.com/leynos/diesel-cte-ext"
+keywords = ["diesel", "cte", "recusive", "with", "sql"]
+categories = ["database"]
 
 resolver = "2"
 
