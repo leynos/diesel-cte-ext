@@ -24,6 +24,78 @@ fn sqlite_sync_recursive_sequence() {
     assert_eq!(rows, vec![1, 2, 3, 4]);
 }
 
+#[test]
+fn sqlite_graph_cycle_duplicate_behaviour() {
+    use diesel::{RunQueryDsl, sql_query};
+
+    let mut conn = SqliteConnection::establish(":memory:").expect("in-memory sqlite");
+    sql_query("CREATE TABLE edges (source INTEGER NOT NULL, target INTEGER NOT NULL)")
+        .execute(&mut conn)
+        .expect("create edges table");
+    sql_query("INSERT INTO edges (source, target) VALUES (1, 2), (1, 3), (2, 3), (3, 2), (2, 4)")
+        .execute(&mut conn)
+        .expect("insert graph edges");
+
+    // UNION ALL requires explicit cycle limiting for this graph; duplicate rows
+    // can still emerge and then need DISTINCT in the final body query.
+    let union_all_rows: Vec<i32> = conn
+        .with_recursive(
+            "walk",
+            &["node"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>(concat!(
+                    "SELECT edges.target ",
+                    "FROM edges ",
+                    "INNER JOIN walk ON edges.source = walk.node ",
+                    "WHERE walk.node < 3"
+                )),
+                sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
+            ),
+        )
+        .load(&mut conn)
+        .expect("load UNION ALL rows");
+    assert_eq!(union_all_rows, vec![2, 3, 3, 4]);
+
+    let union_all_distinct_rows: Vec<i32> = conn
+        .with_recursive(
+            "walk",
+            &["node"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>(concat!(
+                    "SELECT edges.target ",
+                    "FROM edges ",
+                    "INNER JOIN walk ON edges.source = walk.node ",
+                    "WHERE walk.node < 3"
+                )),
+                sql::<Integer>("SELECT DISTINCT node FROM walk WHERE node <> 1 ORDER BY node"),
+            ),
+        )
+        .load(&mut conn)
+        .expect("load DISTINCT UNION ALL rows");
+
+    let union_rows: Vec<i32> = conn
+        .with_recursive_not_all(
+            "walk",
+            &["node"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT 1"),
+                sql::<Integer>(concat!(
+                    "SELECT edges.target ",
+                    "FROM edges ",
+                    "INNER JOIN walk ON edges.source = walk.node"
+                )),
+                sql::<Integer>("SELECT node FROM walk WHERE node <> 1 ORDER BY node"),
+            ),
+        )
+        .load(&mut conn)
+        .expect("load UNION rows");
+
+    assert_eq!(union_rows, vec![2, 3, 4]);
+    assert_eq!(union_rows, union_all_distinct_rows);
+}
+
 #[cfg(feature = "async")]
 mod async_sqlite {
     use super::*;

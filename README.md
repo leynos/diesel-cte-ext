@@ -8,7 +8,7 @@ and async Diesel connections.
 ## Highlights
 
 - Friendly builders for `WITH` and `WITH RECURSIVE` queries via
-  `RecursiveCTEExt`.
+  `RecursiveCTEExt`, including both `UNION ALL` and `UNION` recursive modes.
 - Column helpers (`columns!` and `table_columns!`) that marry runtime names to
   compile-time Diesel metadata.
 - Async-ready: enable the `async` feature to extend the helpers to
@@ -42,6 +42,27 @@ fn five_high(mut conn: PgConnection) -> diesel::QueryResult<Vec<i32>> {
             sql::<Integer>("SELECT 1"),
             sql::<Integer>("SELECT n + 1 FROM series WHERE n < 5"),
             sql::<Integer>("SELECT n FROM series"),
+        ),
+    )
+    .load(&mut conn)
+}
+```
+
+Use `with_recursive_not_all` when you want recursive deduplication at the CTE
+level (`UNION`) instead of `UNION ALL`:
+
+```rust,no_run
+use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
+use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
+
+fn reachable(mut conn: PgConnection) -> diesel::QueryResult<Vec<i32>> {
+    conn.with_recursive_not_all(
+        "graph",
+        &["node_id"],
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT target_id FROM edges INNER JOIN graph ON source_id = node_id"),
+            sql::<Integer>("SELECT node_id FROM graph ORDER BY node_id"),
         ),
     )
     .load(&mut conn)
