@@ -111,10 +111,13 @@ where
 mod tests {
     use super::*;
     use crate::test_support::normalise_debug_sql;
-    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite};
+    use diesel::{
+        debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite,
+    };
     use rstest::{fixture, rstest};
 
-    type TestRecursiveParts = RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>;
+    type TestRecursiveParts =
+        RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>;
 
     enum Builder {
         All,
@@ -139,13 +142,19 @@ mod tests {
         #[case] union_op: &str,
     ) {
         let query = match builder {
-            Builder::All => with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
-            Builder::Distinct => with_recursive_not_all::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
+            Builder::All => {
+                with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts)
+            }
+            Builder::Distinct => {
+                with_recursive_not_all::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts)
+            }
         };
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums) SELECT n FROM nums")
+            format!(
+                "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums) SELECT n FROM nums"
+            )
         );
     }
 

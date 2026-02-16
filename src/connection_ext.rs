@@ -51,18 +51,14 @@ pub trait RecursiveCTEExt {
         with_recursive,
         WithRecursive,
         "builders::with_recursive",
-        r#"Create a [`WithRecursive`] builder for this connection's backend.
-        
-        See [`builders::with_recursive`] for parameter details."#
+        "Create a [`WithRecursive`] builder for this connection's backend.\n\nSee [`builders::with_recursive`] for parameter details."
     );
 
     impl_with_recursive_methods!(
         with_recursive_not_all,
         WithRecursive,
         "builders::with_recursive_not_all",
-        r#"Create a [`WithRecursive`] builder for this connection's backend using UNION (distinct).
-
-        See [`builders::with_recursive_not_all`] for parameter details."#
+        "Create a [`WithRecursive`] builder for this connection's backend using UNION (distinct).\n\nSee [`builders::with_recursive_not_all`] for parameter details."
     );
 
     /// Create a [`WithCte`] builder for this connection's backend.
@@ -115,8 +111,8 @@ mod tests {
     use super::*;
     use crate::{builders::RecursiveParts, test_support::normalise_debug_sql};
     use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
-    use std::marker::PhantomData;
     use rstest::{fixture, rstest};
+    use std::marker::PhantomData;
 
     #[cfg(feature = "sqlite")]
     use diesel::sqlite::Sqlite;
@@ -156,7 +152,9 @@ mod tests {
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums")
+            format!(
+                "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
+            )
         );
     }
 
@@ -196,7 +194,9 @@ mod tests {
         let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
         assert_eq!(
             sql,
-            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums")
+            format!(
+                "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
+            )
         );
     }
 

@@ -78,9 +78,8 @@ fn up_to_five(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
 }
 ```
 
-`with_recursive` renders a recursive `UNION ALL`. Use
-`with_recursive_not_all` when the recursive term should deduplicate at each
-iteration using `UNION`.
+`with_recursive` renders a recursive `UNION ALL`. Use `with_recursive_not_all`
+when the recursive term should deduplicate at each iteration using `UNION`.
 
 ```rust,no_run
 use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
