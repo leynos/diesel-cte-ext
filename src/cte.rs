@@ -88,6 +88,37 @@ impl RecursiveBackend for diesel::sqlite::Sqlite {}
 #[cfg(feature = "postgres")]
 impl RecursiveBackend for diesel::pg::Pg {}
 
+/// Specifies how the seed and recursive step queries are combined in a
+/// recursive CTE.
+///
+/// - `All` corresponds to `UNION ALL`, preserving duplicate rows between the
+///   seed and step results.
+/// - `Distinct` corresponds to `UNION`, which removes duplicate rows.
+#[derive(Debug, Clone, Copy)]
+pub enum UnionKind {
+    /// Use `UNION ALL` between the seed and step queries.
+    All,
+    /// Use `UNION` between the seed and step queries (duplicates removed).
+    Distinct,
+}
+impl UnionKind {
+    /// Returns the SQL fragment used to combine the seed and recursive step of a
+    /// recursive CTE.
+    ///
+    /// The returned string includes leading and trailing spaces so it can be
+    /// concatenated directly into the generated SQL without adding extra
+    /// separators.
+    ///
+    /// - `UnionKind::All` -> `" UNION ALL "` (preserves duplicate rows)
+    /// - `UnionKind::Distinct` -> `" UNION "` (removes duplicate rows)
+    fn as_sql(&self) -> &'static str {
+        match self {
+            UnionKind::All => " UNION ALL ",
+            UnionKind::Distinct => " UNION ",
+        }
+    }
+}
+
 /// Representation of a recursive CTE query.
 #[derive(Debug, Clone)]
 pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
@@ -96,6 +127,7 @@ pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
     pub(crate) seed: Seed,
     pub(crate) step: Step,
     pub(crate) body: Body,
+    pub(crate) union_kind: UnionKind,
     pub(crate) _marker: std::marker::PhantomData<DB>,
 }
 
@@ -112,7 +144,7 @@ where
         push_identifiers(&mut out, &self.columns)?;
         out.push_sql(" AS (");
         self.seed.walk_ast(out.reborrow())?;
-        out.push_sql(" UNION ALL ");
+        out.push_sql(self.union_kind.as_sql());
         self.step.walk_ast(out.reborrow())?;
         out.push_sql(") ");
         self.body.walk_ast(out.reborrow())
@@ -146,8 +178,8 @@ where
     }
 }
 
-impl_cte_traits!(WithRecursive<Seed, Step, Body>, Body);
 impl_cte_traits!(WithCte<Cte, Body>, Body);
+impl_cte_traits!(WithRecursive<Seed, Step, Body>, Body);
 
 #[cfg(test)]
 mod tests {
@@ -156,7 +188,23 @@ mod tests {
         builders::{self, RecursiveParts},
         test_support::normalise_debug_sql,
     };
-    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite};
+    use rstest::{fixture, rstest};
+
+    enum Builder {
+        All,
+        Distinct,
+    }
+
+    #[fixture]
+    fn sample_parts()
+    -> RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>> {
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
+            sql::<Integer>("SELECT n FROM nums"),
+        )
+    }
 
     #[test]
     fn duplicate_column_names_are_rejected() {
@@ -170,22 +218,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn with_recursive_renders_expected_sql() {
-        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums WHERE n < 2"),
-                sql::<Integer>("SELECT n FROM nums"),
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn with_recursive_renders_expected_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
+        let query = match builder {
+            Builder::All => builders::with_recursive::<Sqlite, _, _, _, _, _>(
+                "nums",
+                &["n"],
+                sample_parts,
             ),
-        );
+            Builder::Distinct => builders::with_recursive_not_all::<Sqlite, _, _, _, _, _>(
+                "nums",
+                &["n"],
+                sample_parts,
+            ),
+        };
 
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums")
         );
     }
 
@@ -194,7 +251,7 @@ mod tests {
         let query = builders::with_cte::<Sqlite, _, _, _, _>(
             "seed",
             &["value"],
-            crate::builders::CteParts::new(
+            builders::CteParts::new(
                 sql::<Integer>("SELECT 42"),
                 sql::<Integer>("SELECT value FROM seed"),
             ),

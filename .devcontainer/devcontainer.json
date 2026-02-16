@@ -1,0 +1,10 @@
+{
+    "name": "Rust & Perl Environment",
+    "image": "mcr.microsoft.com/devcontainers/rust:1",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {
+            "installZsh": true
+        }
+    },
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y perl"
+}

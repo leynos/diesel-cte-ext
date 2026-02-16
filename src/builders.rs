@@ -9,8 +9,36 @@ use diesel::{backend::Backend, query_builder::QueryFragment};
 
 use crate::{
     columns::Columns,
-    cte::{RecursiveBackend, WithCte, WithRecursive},
+    cte::{RecursiveBackend, UnionKind, WithCte, WithRecursive},
 };
+
+macro_rules! impl_recursive_builder {
+    ($fn_name:ident, $union_kind:expr, $doc:expr) => {
+        #[doc = $doc]
+        pub fn $fn_name<DB, Cols, Seed, Step, Body, ColSpec>(
+            cte_name: &'static str,
+            columns: ColSpec,
+            parts: RecursiveParts<Seed, Step, Body>,
+        ) -> WithRecursive<DB, Cols, Seed, Step, Body>
+        where
+            DB: RecursiveBackend,
+            Seed: QueryFragment<DB>,
+            Step: QueryFragment<DB>,
+            Body: QueryFragment<DB>,
+            ColSpec: Into<Columns<Cols>>,
+        {
+            WithRecursive {
+                cte_name,
+                columns: columns.into(),
+                seed: parts.seed,
+                step: parts.step,
+                body: parts.body,
+                union_kind: $union_kind,
+                _marker: std::marker::PhantomData,
+            }
+        }
+    };
+}
 
 /// Query fragments used by a recursive CTE.
 #[derive(Debug, Clone)]
@@ -46,28 +74,17 @@ impl<Cte, Body> CteParts<Cte, Body> {
     }
 }
 
-/// Build a recursive CTE query.
-pub fn with_recursive<DB, Cols, Seed, Step, Body, ColSpec>(
-    cte_name: &'static str,
-    columns: ColSpec,
-    parts: RecursiveParts<Seed, Step, Body>,
-) -> WithRecursive<DB, Cols, Seed, Step, Body>
-where
-    DB: RecursiveBackend,
-    Seed: QueryFragment<DB>,
-    Step: QueryFragment<DB>,
-    Body: QueryFragment<DB>,
-    ColSpec: Into<Columns<Cols>>,
-{
-    WithRecursive {
-        cte_name,
-        columns: columns.into(),
-        seed: parts.seed,
-        step: parts.step,
-        body: parts.body,
-        _marker: std::marker::PhantomData,
-    }
-}
+impl_recursive_builder!(
+    with_recursive,
+    UnionKind::All,
+    "Build a recursive CTE query using `WITH RECURSIVE` and `UNION ALL`."
+);
+
+impl_recursive_builder!(
+    with_recursive_not_all,
+    UnionKind::Distinct,
+    "Build a recursive CTE query using `WITH RECURSIVE` and `UNION` (not `ALL`)."
+);
 
 /// Build a non-recursive CTE query.
 pub fn with_cte<DB, Cols, Cte, Body, ColSpec>(
@@ -94,23 +111,41 @@ where
 mod tests {
     use super::*;
     use crate::test_support::normalise_debug_sql;
-    use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
+    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer, sqlite::Sqlite};
+    use rstest::{fixture, rstest};
 
-    #[test]
-    fn recursive_builder_composes_fragments() {
-        let query = with_recursive::<Sqlite, _, _, _, _, _>(
-            "nums",
-            &["n"],
-            RecursiveParts::new(
-                sql::<Integer>("SELECT 1"),
-                sql::<Integer>("SELECT n + 1 FROM nums"),
-                sql::<Integer>("SELECT n FROM nums"),
-            ),
-        );
+    type TestRecursiveParts = RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>;
+
+    enum Builder {
+        All,
+        Distinct,
+    }
+
+    #[fixture]
+    fn recursive_parts() -> TestRecursiveParts {
+        RecursiveParts::new(
+            sql::<Integer>("SELECT 1"),
+            sql::<Integer>("SELECT n + 1 FROM nums"),
+            sql::<Integer>("SELECT n FROM nums"),
+        )
+    }
+
+    #[rstest]
+    #[case::all(Builder::All, "UNION ALL")]
+    #[case::distinct(Builder::Distinct, "UNION")]
+    fn recursive_builder_composes_fragments(
+        recursive_parts: TestRecursiveParts,
+        #[case] builder: Builder,
+        #[case] union_op: &str,
+    ) {
+        let query = match builder {
+            Builder::All => with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
+            Builder::Distinct => with_recursive_not_all::<Sqlite, _, _, _, _, _>("nums", &["n"], recursive_parts),
+        };
         let sql = normalise_debug_sql(&debug_query::<Sqlite, _>(&query).to_string());
         assert_eq!(
             sql,
-            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums) SELECT n FROM nums"
+            format!("WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums) SELECT n FROM nums")
         );
     }
 
