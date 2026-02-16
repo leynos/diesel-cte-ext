@@ -16,16 +16,6 @@ use crate::columns::Columns;
 
 macro_rules! impl_cte_traits {
     ($name:ident<$($gen:ident),*>, $body_ty:ident) => {
-        impl<DB, Cols, $($gen),*> QueryId for $name<DB, Cols, $($gen),*>
-        where
-            DB: Backend + 'static,
-            Cols: 'static,
-            $($gen: 'static),*
-        {
-            type QueryId = Self;
-            const HAS_STATIC_QUERY_ID: bool = true;
-        }
-
         impl<DB, Cols, $($gen),*> Query for $name<DB, Cols, $($gen),*>
         where
             DB: Backend,
@@ -41,6 +31,20 @@ macro_rules! impl_cte_traits {
             Conn: diesel::connection::Connection<Backend = DB>,
             Self: QueryFragment<DB> + QueryId + Query,
         {}
+    };
+}
+
+macro_rules! impl_static_query_id {
+    ($name:ident<$($gen:ident),*>) => {
+        impl<DB, Cols, $($gen),*> QueryId for $name<DB, Cols, $($gen),*>
+        where
+            DB: Backend + 'static,
+            Cols: 'static,
+            $($gen: 'static),*
+        {
+            type QueryId = Self;
+            const HAS_STATIC_QUERY_ID: bool = true;
+        }
     };
 }
 
@@ -178,6 +182,20 @@ where
     }
 }
 
+impl_static_query_id!(WithCte<Cte, Body>);
+
+impl<DB, Cols, Seed, Step, Body> QueryId for WithRecursive<DB, Cols, Seed, Step, Body>
+where
+    DB: Backend + 'static,
+    Cols: 'static,
+    Seed: 'static,
+    Step: 'static,
+    Body: 'static,
+{
+    type QueryId = ();
+    const HAS_STATIC_QUERY_ID: bool = false;
+}
+
 impl_cte_traits!(WithCte<Cte, Body>, Body);
 impl_cte_traits!(WithRecursive<Seed, Step, Body>, Body);
 
@@ -279,5 +297,24 @@ mod tests {
             sql,
             "WITH RECURSIVE \"nums\" AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
         );
+    }
+
+    #[test]
+    fn query_id_reflects_runtime_union_choice() {
+        type RecursiveQuery = WithRecursive<
+            Sqlite,
+            (),
+            SqlLiteral<Integer>,
+            SqlLiteral<Integer>,
+            SqlLiteral<Integer>,
+        >;
+        type CteQuery = WithCte<Sqlite, (), SqlLiteral<Integer>, SqlLiteral<Integer>>;
+
+        let recursive_has_static =
+            std::hint::black_box(<RecursiveQuery as QueryId>::HAS_STATIC_QUERY_ID);
+        let cte_has_static = std::hint::black_box(<CteQuery as QueryId>::HAS_STATIC_QUERY_ID);
+
+        assert!(!recursive_has_static);
+        assert!(cte_has_static);
     }
 }
