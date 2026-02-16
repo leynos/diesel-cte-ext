@@ -189,12 +189,14 @@ fn sqlite_prepared_statement_cache_isolation_between_union_modes(
 
 #[cfg(feature = "async")]
 mod async_sqlite {
+    //! Async behavioural tests validating recursive CTE helpers via Diesel's
+    //! synchronous `SQLite` wrapper.
+
     use super::*;
     use diesel_async::{
         AsyncConnection, RunQueryDsl as AsyncRunQueryDsl,
         sync_connection_wrapper::SyncConnectionWrapper,
     };
-    use diesel_cte_ext::RecursiveCTEExt;
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn sqlite_async_recursive_sequence() {
