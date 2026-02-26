@@ -555,7 +555,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "pg-embed-setup-unpriv",
- "rstest 0.21.0",
+ "rstest",
  "serde_json",
  "tokio",
  "toml 0.9.8",
@@ -1882,7 +1882,7 @@ dependencies = [
  "postgres",
  "postgresql_embedded",
  "pq-sys",
- "rstest 0.26.1",
+ "rstest",
  "secrecy",
  "serde",
  "serde_json",
@@ -2391,43 +2391,13 @@ dependencies = [
 
 [[package]]
 name = "rstest"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9afd55a67069d6e434a95161415f5beeada95a01c7b815508a82dcb0e1593682"
-dependencies = [
- "futures",
- "futures-timer",
- "rstest_macros 0.21.0",
- "rustc_version",
-]
-
-[[package]]
-name = "rstest"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
 dependencies = [
  "futures-timer",
  "futures-util",
- "rstest_macros 0.26.1",
-]
-
-[[package]]
-name = "rstest_macros"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4165dfae59a39dd41d8dec720d3cbfbc71f69744efb480a3920f5d4e0cc6798d"
-dependencies = [
- "cfg-if",
- "glob",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "regex",
- "relative-path",
- "rustc_version",
- "syn",
- "unicode-ident",
+ "rstest_macros",
 ]
 
 [[package]]
