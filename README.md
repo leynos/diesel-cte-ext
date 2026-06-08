@@ -14,7 +14,7 @@ and async Diesel connections.
 - Async-ready: enable the `async` feature to extend the helpers to
   `diesel_async` connections.
 - Battle-tested Postgres integration tests powered by
-  `pg_embedded_setup_unpriv`, so CI agents without root privileges can still
+  `postgresql_embedded`, so CI agents without root privileges can still
   run the suite end-to-end.
 
 ## Quick start
@@ -109,8 +109,8 @@ make test
 ```
 
 `make test` spins up an embedded PostgreSQL instance via
-`pg_embedded_setup_unpriv`. The helper automatically provisions binaries,
-configures `$PGPASSFILE`, and shuts everything down between tests. No manual
+`postgresql_embedded`. The helper automatically provisions binaries,
+configures, and shuts everything down between tests. No manual
 Postgres installation is required.
 
 Have fun composing queries!

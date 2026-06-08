@@ -166,23 +166,3 @@ let parts = RecursiveParts::new(
     cte_query!(sql::<Integer>("SELECT n FROM series")),
 );
 ```
-
-## Testing with `pg_embedded_setup_unpriv`
-
-The integration tests under `tests/` rely on
-`pg_embedded_setup_unpriv::TestCluster` to provision PostgreSQL without manual
-privileges. Running `make test` triggers the helper to:
-
-1. Stage PostgreSQL binaries and a writable data directory under the current
-   user's home.
-2. Launch the server before each test module executes.
-3. Configure `PGPASSFILE`, `TZ`, and related environment variables so Diesel and
-   libpq clients authenticate automatically.
-4. Shut the cluster down once the `TestCluster` guard drops, preventing leaked
-   `postmaster` processes between tests.
-
-The `tests/postgres_recursive.rs` module demonstrates how to wrap the guard in
-an `rstest` fixture and propagate failures through the test signature instead
-of calling `unwrap`. This pattern should be reused when authoring new tests so
-the harness can skip gracefully on machines that cannot start PostgreSQL (for
-example, when `tzdata` is missing).
