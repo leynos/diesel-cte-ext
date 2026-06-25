@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie
+.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie prepare-pg-worker
 
 
 TARGET ?= libdiesel-cte-ext.rlib
@@ -11,6 +11,9 @@ CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
+PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
+PG_WORKER_PROFILE ?= dev
+PG_WORKER_BUILD_DIR ?= debug
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
@@ -20,8 +23,17 @@ all: check-fmt lint test ## Perform a comprehensive check of code
 clean: ## Remove build artifacts
 	$(CARGO) clean
 
-test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
+test: prepare-pg-worker ## Run tests with warnings treated as errors
+	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
+
+prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
+	mkdir -p "$(dir $(PG_WORKER_PATH))"
+	manifest_path="$$( \
+		$(CARGO) metadata --format-version 1 --locked | \
+		jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)' \
+	)"; \
+	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS); \
+	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" "$(PG_WORKER_PATH)"
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
