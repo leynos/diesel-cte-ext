@@ -141,7 +141,7 @@ pub enum SearchStyle {
 }
 
 impl SearchStyle {
-    fn as_str(&self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::BreadthFirst => "BREADTH FIRST",
             Self::DepthFirst => "DEPTH FIRST",
@@ -164,6 +164,7 @@ pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
 
 impl<DB: Backend, Cols, Seed, Step, Body> WithRecursive<DB, Cols, Seed, Step, Body> {
     /// Specify the search mode for the recursive CTE.
+    #[must_use]
     pub fn with_search(
         self,
         style: SearchStyle,
