@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: IMPLEMENTED
 
 ## Purpose / big picture
 
@@ -141,17 +141,25 @@ conflict in `Decision Log`, and ask for direction.
   why the implementation deliberately keeps tests self-contained.
 - [x] (2026-06-25) Update developer documentation to describe the new test
       workflow.
-- [ ] Run formatting, Markdown, lint, and test gates.
-- [ ] Commit the completed adoption work with a clear commit message.
+- [x] (2026-06-25) Run formatting, Markdown, lint, and test gates.
+- [x] (2026-06-25) Commit the completed adoption work with a clear commit
+      message.
+- [x] (2026-06-25) Address review follow-up by making the run-id suffix
+      portable,
+  adding the sticky bit to `PG_EMBED_BASE`, and refreshing stale execplan
+  discovery text.
+- [x] (2026-06-25) Re-run deterministic validation and CodeRabbit after the
+      review
+  fixes.
 
 ## Surprises & discoveries
 
-- Observation: implementation has started and the plan is being maintained as a
-  living document. Evidence: the status is `IN PROGRESS`, the progress log
-  records completed implementation milestones, and this section now records
-  findings discovered during execution. Impact: future agents should treat the
-  notes below as current implementation evidence, not pre-implementation
-  placeholders.
+- Observation: implementation has completed and the plan has been updated as a
+  living document. Evidence: the status is `IMPLEMENTED`, the progress log
+  records completed implementation and review-fix milestones, and this section
+  records findings discovered during execution. Impact: future agents should
+  treat the notes below as current implementation evidence, not
+  pre-implementation placeholders.
 
 - Observation: `Makefile` already contains a `prepare-pg-worker` target and
   `make test` already exports `PG_EMBEDDED_WORKER` from
@@ -238,6 +246,13 @@ conflict in `Decision Log`, and ask for direction.
   Impact: the review findings were valid and fixed with a narrow Makefile and
   execplan update.
 
+- Observation: the review-fix branch state passed deterministic validation and
+  CodeRabbit review. Evidence: `make fmt`, `make check-fmt`,
+  `make markdownlint`, `make nixie`, `make lint`, `make test`,
+  `git diff --check`, and `coderabbit review --agent` passed after commit
+  `642ea9a`, with CodeRabbit reporting 0 findings. Impact: the implementation
+  status can be recorded as complete in this plan.
+
 ## Decision Log
 
 - Decision: Target upstream shared-cluster access rather than per-test
@@ -308,11 +323,12 @@ async PostgreSQL, non-recursive CTEs, and template-cloned database isolation.
 ## Context and orientation
 
 This repository is the Rust crate `diesel-cte-ext`. PostgreSQL integration
-tests live in `tests/postgres_recursive.rs`. That file currently imports
-`tests/test_helpers.rs`, configures `PG_RUNTIME_DIR`, `PG_DATA_DIR`, and
-`PG_PASSWORD`, builds `pg_worker` when running as `root`, starts
-`TestCluster::new()` in the `embedded_cluster` rstest fixture, and creates a
-per-test `TemporaryDatabase` from a fixed template named `cte_ext_template`.
+tests live in `tests/postgres_recursive.rs`. Before this implementation, that
+file imported `tests/test_helpers.rs`, configured `PG_RUNTIME_DIR`,
+`PG_DATA_DIR`, and `PG_PASSWORD`, built `pg_worker` when running as `root`,
+started `TestCluster::new()` in the `embedded_cluster` rstest fixture, and
+created a per-test `TemporaryDatabase` from a fixed template named
+`cte_ext_template`.
 
 The dependency is already:
 
@@ -320,39 +336,37 @@ The dependency is already:
 pg-embed-setup-unpriv = { version = "0.5.1", features = ["diesel-support"] }
 ```
 
-The current code has already adopted:
+The implemented code now uses:
 
-- `TestCluster`.
 - `TemporaryDatabase`.
 - `ensure_template_exists`.
 - `temporary_database_from_template`.
 - `diesel_connection()`.
+- `test_support::shared_cluster_handle()`.
+- `ClusterHandle`.
 - The `diesel-support` feature.
+- Makefile-managed `pg_worker` preparation.
 
-The current code has not fully adopted:
+The implemented code deliberately does not use:
 
 - upstream rstest fixtures such as `test_support::test_cluster` or
-  `shared_test_cluster`;
-- upstream process-shared cluster handles such as
-  `test_support::shared_cluster_handle()`;
-- v0.5.0 default `CleanupMode::DataOnly` and partial data-directory recovery
-  as replacements for local data-directory deletion;
-- v0.5.1 first-class `pg_worker` distribution through normal tooling.
+  `shared_test_cluster`, because direct `shared_cluster_handle()` access fits
+  the existing template helper shape;
+- the upstream `async-api` feature, because the synchronous shared handle
+  already provides database URLs that the async Diesel test can use.
 
 Important local files:
 
 - `Cargo.toml` declares the dev-dependency and features.
-- `tests/postgres_recursive.rs` contains the PostgreSQL tests, the local
-  `embedded_cluster` fixture, manual worker build helpers, and template
-  database helper.
-- `tests/test_helpers.rs` contains `EnvVarGuard`, env-var mutation helpers,
-  data-directory cleanup, `.pgpass` cleanup, and related unit tests.
-- `tests/env_var_guard.rs` tests behaviour that should disappear if
-  `EnvVarGuard` is removed.
+- `tests/postgres_recursive.rs` contains the PostgreSQL tests and the small
+  template database helper built on `ClusterHandle`.
+- `tests/test_helpers.rs` was deleted because upstream shared-cluster support
+  replaced the local harness helper.
+- `tests/env_var_guard.rs` was deleted because `EnvVarGuard` was removed.
 - `Makefile` defines `make check-fmt`, `make lint`, `make test`,
-  `make fmt`, `make markdownlint`, and `make nixie`.
-- `.github/workflows/ci.yml` currently runs formatting, Markdown lint, lint,
-  and coverage-backed tests but does not explicitly prepare `pg_worker`.
+  `make fmt`, `make markdownlint`, `make nixie`, and `prepare-pg-worker`.
+- `.github/workflows/ci.yml` runs the existing formatting, Markdown lint, lint,
+  and coverage-backed tests.
 - `docs/developers-guide.md` should describe the adopted testing workflow.
 - `docs/pg-embed-setup-unpriv-users-guide.md` already records the upstream
   v0.5.1 guide and should be linked rather than duplicated.
