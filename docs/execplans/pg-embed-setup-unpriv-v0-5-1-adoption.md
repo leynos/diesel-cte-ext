@@ -127,15 +127,20 @@ conflict in `Decision Log`, and ask for direction.
 - [x] (2026-06-25) Create the ADR documenting the shared embedded PostgreSQL
       test-cluster
   decision.
-- [ ] Add the smallest regression test that fails before the fixture
+- [x] (2026-06-25) Add the smallest regression test that fails before the
+      fixture
   migration and proves shared-cluster, per-test database isolation.
-- [ ] Replace the local `embedded_cluster` fixture with upstream shared
+- [x] (2026-06-25) Replace the local `embedded_cluster` fixture with upstream
+      shared
   cluster access and a small per-test template database helper.
-- [ ] Remove obsolete environment guard, manual data-directory cleanup, and
+- [x] (2026-06-25) Remove obsolete environment guard, manual data-directory
+      cleanup, and
   manual worker-build code.
-- [ ] Move `pg_worker` preparation into Makefile and CI/tooling, or document
+- [x] (2026-06-25) Move `pg_worker` preparation into Makefile and CI/tooling,
+      or document
   why the implementation deliberately keeps tests self-contained.
-- [ ] Update developer documentation to describe the new test workflow.
+- [x] (2026-06-25) Update developer documentation to describe the new test
+      workflow.
 - [ ] Run formatting, Markdown, lint, and test gates.
 - [ ] Commit the completed adoption work with a clear commit message.
 
@@ -159,6 +164,69 @@ conflict in `Decision Log`, and ask for direction.
   `/tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
   Impact: implementation can proceed without treating embedded PostgreSQL
   startup as an environmental blocker.
+
+- Observation: the red-stage regression test failed for the expected
+  architecture reason before the helper migration. Evidence:
+  `/tmp/postgres-recursive-red-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  contains `expected &TestCluster, found &ClusterHandle` for
+  `templated_database(cluster)`. Impact: the test proved the local helper still
+  depended on the per-test cluster guard shape before the green change.
+
+- Observation: after removing Rust-side worker preparation, the first
+  `make prepare-pg-worker` attempt failed because `Cargo.lock` still listed
+  removed direct dev-dependencies and the Makefile recipe continued after an
+  empty metadata result. Evidence:
+  `/tmp/prepare-pg-worker-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  initially showed
+  `the lock file ... needs to be updated but --locked was passed` and then an
+  empty manifest-path failure. Impact: `Cargo.lock` was updated minimally to
+  remove only the root package's direct `serde_json` and `toml` entries, and
+  the Makefile target now uses `set -e` plus a non-empty manifest-path check.
+
+- Observation: the green-stage focused PostgreSQL test passed after the shared
+  cluster migration. Evidence:
+  `cargo test --all-features --test postgres_recursive` passed 4 tests with
+  `PG_EMBEDDED_WORKER` set to `target/pg_worker` in
+  `/tmp/postgres-recursive-green-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the shared handle, per-test template-cloned databases, and existing
+  sync and async recursive CTE coverage work together.
+
+- Observation: after the shared-cluster process exited once, subsequent
+  PostgreSQL tests failed under the upstream root default path with
+  `failed to connect to admin database`, while no live PostgreSQL process or
+  `/var/tmp/pg-embed-1000/data` directory remained. A fixed target-local
+  `PG_RUNTIME_DIR` and `PG_DATA_DIR` passed once, then failed the same way on a
+  later process run. A unique target-local base directory passed the focused
+  rerun. Evidence:
+  `/tmp/postgres-recursive-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  and
+  `/tmp/postgres-recursive-debug-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  captured the repeated failure, while
+  `/tmp/postgres-recursive-unique-dirs-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  captured the passing unique-directory run. Impact: Makefile now supplies
+  `PG_RUNTIME_DIR` and `PG_DATA_DIR` under a fresh
+  `target/pg-embed-runs/<run-id>` base for each `make test` invocation, without
+  reintroducing Rust-side env guards or manual data deletion.
+
+- Observation: the first `make test` gate after introducing run ids failed
+  before Cargo tests because `PG_EMBED_RUN_ID ?= $(shell ...)` recomputed on
+  each recursive Make variable expansion. Evidence:
+  `/tmp/test-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out` showed
+  `mkdir` and `chmod` targeting different run ids. Impact: the run id now uses
+  an immediate conditional assignment, preserving explicit overrides while
+  keeping all paths stable within a single `make` invocation.
+
+- Observation: the full post-migration gate set passed after stabilizing the
+  Makefile run id. Evidence: `make fmt`, `make check-fmt`, `make markdownlint`,
+  `make nixie`, `make lint`, and `make test` passed in
+  `/tmp/fmt-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/check-fmt-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/markdownlint-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/nixie-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/lint-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  and
+  `/tmp/test-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the shared-cluster implementation is ready for review.
 
 ## Decision Log
 
@@ -185,12 +253,47 @@ conflict in `Decision Log`, and ask for direction.
   the request explicitly asks to proceed with implementation and to keep this
   execplan up to date. Date/Author: 2026-06-25, implementation agent.
 
+- Decision: Keep the asynchronous PostgreSQL coverage as a synchronous
+  `#[test]` with an internal Tokio runtime instead of enabling
+  `pg-embed-setup-unpriv`'s `async-api` feature. Rationale: the shared
+  synchronous cluster handle already supports the async Diesel connection by
+  exposing the temporary database URL, so enabling another upstream feature
+  would add feature surface without deleting meaningful local code.
+  Date/Author: 2026-06-25, implementation agent.
+
+- Decision: Harden the existing `prepare-pg-worker` target rather than adding
+  another worker preparation path. Rationale: the target already builds the
+  locked `pg_worker` binary and exports it through `make test`; adding `set -e`
+  and checking that `cargo metadata` returned a manifest path prevents the
+  recipe from continuing after deterministic setup failures. Date/Author:
+  2026-06-25, implementation agent.
+
+- Decision: Configure `PG_RUNTIME_DIR` and `PG_DATA_DIR` in Makefile test
+  tooling rather than in Rust tests, and allocate a unique target-local base per
+  `make test` invocation. Rationale: upstream defaults under `/var/tmp` and a
+  fixed target-local path failed on repeated root-capable runs in this
+  workspace, while a unique target-local base passed and is easier to inspect.
+  Keeping the setting in Makefile preserves explicit tooling ownership and
+  avoids restoring `EnvVarGuard`, data-directory deletion, or Rust-side worker
+  setup. Date/Author: 2026-06-25, implementation agent.
+
 ## Outcomes & retrospective
 
-No implementation outcome exists yet. At completion, summarize which local
-helpers were deleted, which upstream APIs replaced them, what happened to
-root-agent worker setup, and whether the focused PostgreSQL test runtime
-improved.
+The PostgreSQL integration tests now use `pg-embed-setup-unpriv` v0.5.1's shared
+`ClusterHandle` test support and per-test temporary databases cloned from the
+existing template. The local `TestCluster` helper, environment guard, Rust-side
+worker build path, and direct `serde_json`/`toml` dev-dependencies were deleted.
+
+Root-capable test support moved to Makefile-owned setup: `prepare-pg-worker`
+builds the locked upstream `pg_worker`, `make test` exports the worker path,
+and each full test invocation receives a unique target-local runtime/data base
+under `target/pg-embed-runs/<run-id>`. This kept embedded PostgreSQL startup
+reproducible across repeated process runs in this workspace without adding
+manual Rust-side data cleanup.
+
+The focused PostgreSQL test count dropped from 8 to 4 because the local helper
+unit tests disappeared. Behavioural coverage remains over sync PostgreSQL,
+async PostgreSQL, non-recursive CTEs, and template-cloned database isolation.
 
 ## Context and orientation
 
