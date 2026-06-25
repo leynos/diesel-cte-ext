@@ -197,23 +197,37 @@ fn generated_search_tree() -> impl Strategy<Value = Vec<(i32, Option<i32>)>> {
     (
         0usize..8,
         (
-            1i32..=1,
-            1i32..=2,
-            1i32..=3,
-            1i32..=4,
-            1i32..=5,
-            1i32..=6,
-            1i32..=7,
+            0usize..1,
+            0usize..2,
+            0usize..3,
+            0usize..4,
+            0usize..5,
+            0usize..6,
+            0usize..7,
         ),
     )
-        .prop_map(|(extra_nodes, parents)| {
-            let parent_ids = [
-                parents.0, parents.1, parents.2, parents.3, parents.4, parents.5, parents.6,
+        .prop_map(|(extra_nodes, generated_parent_indexes)| {
+            let parent_indexes = [
+                generated_parent_indexes.0,
+                generated_parent_indexes.1,
+                generated_parent_indexes.2,
+                generated_parent_indexes.3,
+                generated_parent_indexes.4,
+                generated_parent_indexes.5,
+                generated_parent_indexes.6,
             ];
             let child_ids = [2, 3, 4, 5, 6, 7, 8];
             let mut nodes = vec![(1, None)];
-            for (id, parent_id) in child_ids.into_iter().zip(parent_ids).take(extra_nodes) {
+            let mut emitted_ids = vec![1];
+            for (id, parent_index) in child_ids.into_iter().zip(parent_indexes).take(extra_nodes) {
+                let parent_id = emitted_ids
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .find_map(|(index, node_id)| (index == parent_index).then_some(node_id))
+                    .unwrap_or(1);
                 nodes.push((id, Some(parent_id)));
+                emitted_ids.push(id);
             }
             nodes
         })
