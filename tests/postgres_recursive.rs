@@ -118,6 +118,9 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
     Ok(())
 }
 
+#[rstest]
+#[case::breadth_first(SearchStyle::BreadthFirst, &[1, 2, 3, 4, 5, 6])]
+#[case::depth_first(SearchStyle::DepthFirst, &[1, 2, 4, 5, 3, 6])]
 fn recursive_search_order_uses_postgres_search_clause(
     embedded_cluster: GuardedCluster,
     #[case] style: SearchStyle,
