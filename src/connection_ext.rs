@@ -109,7 +109,7 @@ impl<B> RecursiveCTEExt for SyncConnectionWrapper<diesel::sqlite::SqliteConnecti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builders::RecursiveParts, test_support::normalise_debug_sql};
+    use crate::{SearchStyle, builders::RecursiveParts, test_support::normalise_debug_sql};
     use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
     use rstest::{fixture, rstest};
     use std::marker::PhantomData;
@@ -196,6 +196,28 @@ mod tests {
             sql,
             format!(
                 "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
+            )
+        );
+    }
+
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    #[case::breadth_first(SearchStyle::BreadthFirst, "BREADTH FIRST")]
+    #[case::depth_first(SearchStyle::DepthFirst, "DEPTH FIRST")]
+    fn postgres_backend_builds_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] style: SearchStyle,
+        #[case] expected_style: &str,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(style, "n", "ordercol");
+        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            format!(
+                "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SEARCH {expected_style} BY \"n\" SET \"ordercol\" SELECT n FROM nums"
             )
         );
     }

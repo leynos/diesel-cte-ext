@@ -327,6 +327,22 @@ mod tests {
         );
     }
 
+    #[rstest]
+    fn with_search_stores_search_config(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+    ) {
+        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::DepthFirst, "n", "ordercol");
+
+        let config = query
+            .search_config
+            .as_ref()
+            .expect("with_search should store search configuration");
+        assert!(matches!(config.style, SearchStyle::DepthFirst));
+        assert_eq!(config.search_column, "n");
+        assert_eq!(config.output_column, "ordercol");
+    }
+
     #[test]
     fn with_cte_renders_expected_sql() {
         let query = builders::with_cte::<Sqlite, _, _, _, _>(

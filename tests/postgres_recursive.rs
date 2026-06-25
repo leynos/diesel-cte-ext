@@ -118,6 +118,64 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
     Ok(())
 }
 
+fn recursive_search_order_uses_postgres_search_clause(
+    embedded_cluster: GuardedCluster,
+    #[case] style: SearchStyle,
+    #[case] expected: &[i32],
+) -> TestResult<()> {
+    let (_env_guard, cluster) = embedded_cluster?;
+    let temp_db = templated_database(&cluster)?;
+    let mut conn = cluster.connection().diesel_connection(temp_db.name())?;
+    create_search_tree_fixture(&mut conn)?;
+
+    let rows: Vec<i32> = DieselRunQueryDsl::load(
+        conn.with_recursive_not_all(
+            "tree",
+            &["id", "parent_id"],
+            RecursiveParts::new(
+                sql::<Integer>("SELECT id, parent_id FROM search_nodes WHERE parent_id IS NULL"),
+                sql::<Integer>(concat!(
+                    "SELECT search_nodes.id, search_nodes.parent_id ",
+                    "FROM search_nodes INNER JOIN tree ON search_nodes.parent_id = tree.id"
+                )),
+                sql::<Integer>("SELECT id FROM tree ORDER BY ordercol"),
+            ),
+        )
+        .with_search(style, "id", "ordercol"),
+        &mut conn,
+    )?;
+
+    if rows != expected {
+        return Err(format!("expected {expected:?} but saw {rows:?}").into());
+    }
+    Ok(())
+}
+
+fn create_search_tree_fixture(conn: &mut diesel::pg::PgConnection) -> TestResult<()> {
+    DieselRunQueryDsl::execute(
+        sql_query(concat!(
+            "CREATE TEMPORARY TABLE search_nodes (",
+            "id INTEGER PRIMARY KEY, ",
+            "parent_id INTEGER REFERENCES search_nodes(id)",
+            ")"
+        )),
+        conn,
+    )?;
+    DieselRunQueryDsl::execute(
+        sql_query(concat!(
+            "INSERT INTO search_nodes (id, parent_id) VALUES ",
+            "(1, NULL), ",
+            "(2, 1), ",
+            "(3, 1), ",
+            "(4, 2), ",
+            "(5, 2), ",
+            "(6, 3)"
+        )),
+        conn,
+    )?;
+    Ok(())
+}
+
 #[test]
 fn templated_databases_isolate_state_on_shared_cluster() -> TestResult<()> {
     let cluster = shared_cluster_handle()?;
