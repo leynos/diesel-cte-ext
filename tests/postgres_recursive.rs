@@ -2,12 +2,13 @@
 //! Behavioural tests for recursive CTE helpers on `PostgreSQL`.
 
 use diesel::RunQueryDsl as DieselRunQueryDsl;
-use diesel::{dsl::sql, sql_types::Bool, sql_types::Integer};
+use diesel::{dsl::sql, sql_query, sql_types::Bool, sql_types::Integer};
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
-use diesel_cte_ext::{CteParts, RecursiveCTEExt, RecursiveParts};
+use diesel_cte_ext::{CteParts, RecursiveCTEExt, RecursiveParts, SearchStyle};
 use pg_embedded_setup_unpriv::test_support::shared_cluster_handle;
 use pg_embedded_setup_unpriv::{BootstrapResult, ClusterHandle, TemporaryDatabase};
+use rstest::rstest;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static>>;
@@ -122,12 +123,11 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
 #[case::breadth_first(SearchStyle::BreadthFirst, &[1, 2, 3, 4, 5, 6])]
 #[case::depth_first(SearchStyle::DepthFirst, &[1, 2, 4, 5, 3, 6])]
 fn recursive_search_order_uses_postgres_search_clause(
-    embedded_cluster: GuardedCluster,
     #[case] style: SearchStyle,
     #[case] expected: &[i32],
 ) -> TestResult<()> {
-    let (_env_guard, cluster) = embedded_cluster?;
-    let temp_db = templated_database(&cluster)?;
+    let cluster = shared_cluster_handle()?;
+    let temp_db = templated_database(cluster)?;
     let mut conn = cluster.connection().diesel_connection(temp_db.name())?;
     create_search_tree_fixture(&mut conn)?;
 

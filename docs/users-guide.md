@@ -125,7 +125,6 @@ async fn up_to_five_async() -> diesel::QueryResult<Vec<i32>> {
 }
 ```
 
-
 ## Defining the search order
 
 Set the search order of recursive CTEs (breadth or depth first) by chaining
