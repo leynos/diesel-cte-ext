@@ -1,5 +1,7 @@
 //! Search-order support types for recursive CTE queries.
 
+use std::any::TypeId;
+
 use diesel::backend::Backend;
 
 /// Column list used by a recursive CTE `SEARCH ... BY` clause.
@@ -82,12 +84,12 @@ impl SearchStyle {
 
 /// Return whether `DB` supports the SQL-standard recursive `SEARCH` clause.
 #[cfg(feature = "postgres")]
-pub(crate) fn supports_search_clause<DB: Backend>() -> bool {
-    std::any::type_name::<DB>() == std::any::type_name::<diesel::pg::Pg>()
+pub(crate) fn supports_search_clause<DB: Backend + 'static>() -> bool {
+    TypeId::of::<DB>() == TypeId::of::<diesel::pg::Pg>()
 }
 
 /// Return whether `DB` supports the SQL-standard recursive `SEARCH` clause.
 #[cfg(not(feature = "postgres"))]
-pub(crate) const fn supports_search_clause<DB: Backend>() -> bool {
+pub(crate) const fn supports_search_clause<DB: Backend + 'static>() -> bool {
     false
 }

@@ -169,7 +169,17 @@ pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
 }
 
 impl<DB: Backend, Cols, Seed, Step, Body> WithRecursive<DB, Cols, Seed, Step, Body> {
-    /// Specify the search mode for the recursive CTE.
+    /// Specify recursive CTE search ordering for the `PostgreSQL` backend.
+    ///
+    /// `style` selects breadth-first or depth-first traversal.
+    /// `search_columns` supplies the column or columns rendered after
+    /// `SEARCH ... BY`, and `output_column` names the generated ordering column
+    /// rendered after `SET`.
+    ///
+    /// The `PostgreSQL` backend is the only supported backend for
+    /// `SEARCH ... BY ... SET`.
+    /// Rendering or executing a searched recursive CTE on another backend fails
+    /// with [`Error::QueryBuilderError`].
     #[must_use]
     pub fn with_search<SearchCols>(
         self,
@@ -193,7 +203,7 @@ impl<DB: Backend, Cols, Seed, Step, Body> WithRecursive<DB, Cols, Seed, Step, Bo
 
 impl<DB, Cols, Seed, Step, Body> QueryFragment<DB> for WithRecursive<DB, Cols, Seed, Step, Body>
 where
-    DB: Backend,
+    DB: Backend + 'static,
     Seed: QueryFragment<DB>,
     Step: QueryFragment<DB>,
     Body: QueryFragment<DB>,

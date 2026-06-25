@@ -15,12 +15,13 @@ constructing query internals directly.
 
 In the context of exposing PostgreSQL recursive CTE search ordering, facing the
 concern that callers need a stable public API whilst the generated SQL carries
-backend-specific details, we decided for a public `SearchStyle` enum and a
-chainable `WithRecursive::with_search` method backed by an internal
-`SearchConfig`, and against exporting `SearchConfig` or requiring callers to
-assemble raw `SEARCH` fragments themselves, to achieve a small typed API that
-fits the existing builder flow, accepting that future PostgreSQL search clause
-options may require extending the method or adding a second builder step.
+backend-specific details, the selected design is a public `SearchStyle` enum
+and a chainable `WithRecursive::with_search` method backed by an internal
+`SearchConfig`. `SearchConfig` is not exported, and callers are not required to
+assemble raw `SEARCH` fragments themselves. This keeps the API small and typed
+whilst fitting the existing builder flow, accepting that future PostgreSQL
+search clause options may require extending the method or adding a second
+builder step.
 
 ## Consequences
 
