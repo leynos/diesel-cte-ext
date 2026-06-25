@@ -132,6 +132,11 @@ Set the search order of recursive CTEs (breadth or depth first) by chaining
 Pass a single column name or a static list of column names to control the
 `SEARCH ... BY` ordering expression.
 
+`with_search` is PostgreSQL-only. The builder remains available on recursive
+queries, but rendering or executing a searched recursive CTE against SQLite or
+another backend returns a query-builder error instead of emitting unsupported
+`SEARCH` syntax.
+
 ```rust,no_run
 use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts, SearchStyle};

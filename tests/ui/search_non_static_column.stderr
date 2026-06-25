@@ -1,0 +1,23 @@
+error[E0597]: `search_column` does not live long enough
+  --> tests/ui/search_non_static_column.rs:18:45
+   |
+ 5 |       let search_column = String::from("id");
+   |           ------------- binding `search_column` declared here
+ 6 |       let _query = conn.with_recursive(
+   |  __________________-
+ 7 | |         "tree",
+ 8 | |         &["id", "parent_id"],
+ 9 | |         RecursiveParts::new(
+...  |
+18 | |     .with_search(SearchStyle::BreadthFirst, search_column.as_str(), "ordercol");
+   | |_____________________________________________^^^^^^^^^^^^^_____________________- argument requires that `search_column` is borrowed for `'static`
+   |                                               |
+   |                                               borrowed value does not live long enough
+19 |   }
+   |   - `search_column` dropped here while still borrowed
+   |
+note: requirement that the value outlives `'static` introduced here
+  --> src/cte.rs
+   |
+   |         SearchCols: Into<SearchColumnList>,
+   |                     ^^^^^^^^^^^^^^^^^^^^^^

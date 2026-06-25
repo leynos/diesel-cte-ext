@@ -17,6 +17,7 @@ impl SearchColumnList {
 }
 
 impl From<&'static str> for SearchColumnList {
+    /// Store one static column name as a recursive CTE search key.
     fn from(name: &'static str) -> Self {
         Self {
             names: SearchColumnNames::Single(name),
@@ -25,6 +26,7 @@ impl From<&'static str> for SearchColumnList {
 }
 
 impl From<&'static [&'static str]> for SearchColumnList {
+    /// Store a static column list as recursive CTE search keys.
     fn from(names: &'static [&'static str]) -> Self {
         Self {
             names: SearchColumnNames::List(names),
@@ -33,6 +35,7 @@ impl From<&'static [&'static str]> for SearchColumnList {
 }
 
 impl<const N: usize> From<&'static [&'static str; N]> for SearchColumnList {
+    /// Store a static array as recursive CTE search keys.
     fn from(names: &'static [&'static str; N]) -> Self {
         Self::from(&names[..])
     }
@@ -41,15 +44,20 @@ impl<const N: usize> From<&'static [&'static str; N]> for SearchColumnList {
 /// Runtime storage for one or more recursive CTE search columns.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SearchColumnNames {
+    /// A single `SEARCH ... BY` column.
     Single(&'static str),
+    /// A comma-separated `SEARCH ... BY` column list.
     List(&'static [&'static str]),
 }
 
 /// Internal search clause configuration for recursive CTEs.
 #[derive(Debug, Clone)]
 pub(crate) struct SearchConfig {
+    /// Traversal mode rendered after `SEARCH`.
     pub(crate) style: SearchStyle,
+    /// Column or columns rendered after `BY`.
     pub(crate) search_columns: SearchColumnList,
+    /// Synthetic ordering column rendered after `SET`.
     pub(crate) output_column: &'static str,
 }
 
@@ -63,6 +71,7 @@ pub enum SearchStyle {
 }
 
 impl SearchStyle {
+    /// Return the SQL spelling for this search traversal mode.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::BreadthFirst => "BREADTH FIRST",
@@ -71,11 +80,13 @@ impl SearchStyle {
     }
 }
 
+/// Return whether `DB` supports the SQL-standard recursive `SEARCH` clause.
 #[cfg(feature = "postgres")]
 pub(crate) fn supports_search_clause<DB: Backend>() -> bool {
     std::any::type_name::<DB>() == std::any::type_name::<diesel::pg::Pg>()
 }
 
+/// Return whether `DB` supports the SQL-standard recursive `SEARCH` clause.
 #[cfg(not(feature = "postgres"))]
 pub(crate) const fn supports_search_clause<DB: Backend>() -> bool {
     false
