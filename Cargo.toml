@@ -92,5 +92,3 @@ diesel-async = { version = "0.9", features = ["sqlite", "postgres", "tokio", "as
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rstest = "0.26"
 pg-embed-setup-unpriv = { version = "0.5.1", features = ["diesel-support"] }
-serde_json = "1"
-toml = "0.9"

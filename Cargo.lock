@@ -564,9 +564,7 @@ dependencies = [
  "diesel-async",
  "pg-embed-setup-unpriv",
  "rstest",
- "serde_json",
  "tokio",
- "toml 0.9.8",
 ]
 
 [[package]]

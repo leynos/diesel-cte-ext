@@ -110,7 +110,8 @@ make test
 
 `make test` spins up an embedded PostgreSQL instance via
 `pg_embedded_setup_unpriv`. The helper automatically provisions binaries,
-configures `$PGPASSFILE`, and shuts everything down between tests. No manual
-Postgres installation is required.
+configures `$PGPASSFILE`, and reuses one shared cluster while each test
+receives an isolated temporary database. No manual Postgres installation is
+required.
 
 Have fun composing queries!

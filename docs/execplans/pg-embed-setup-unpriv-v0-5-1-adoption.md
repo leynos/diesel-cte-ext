@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IMPLEMENTED
 
 ## Purpose / big picture
 
@@ -115,31 +115,143 @@ conflict in `Decision Log`, and ask for direction.
 
 - [x] (2026-06-25) Drafted the adoption plan from the current harness audit
   and cross-repository findings.
-- [ ] Load the required skills for implementation:
+- [x] (2026-06-25) Load the required skills for implementation:
   `rust-router`, `rust-unit-testing`, `arch-decision-records`, and
   `commit-message`.
-- [ ] Establish the baseline by running the focused PostgreSQL tests and the
+- [x] (2026-06-25) Rename the implementation branch to
+  `pg-embed-setup-unpriv-v0-5-1-adoption`. The matching `origin` branch does
+  not exist yet, so upstream tracking will be set on first push.
+- [x] (2026-06-25) Establish the baseline by running the focused PostgreSQL
+      tests and the
   relevant quality gates.
-- [ ] Create the ADR documenting the shared embedded PostgreSQL test-cluster
+- [x] (2026-06-25) Create the ADR documenting the shared embedded PostgreSQL
+      test-cluster
   decision.
-- [ ] Add the smallest regression test that fails before the fixture
+- [x] (2026-06-25) Add the smallest regression test that fails before the
+      fixture
   migration and proves shared-cluster, per-test database isolation.
-- [ ] Replace the local `embedded_cluster` fixture with upstream shared
+- [x] (2026-06-25) Replace the local `embedded_cluster` fixture with upstream
+      shared
   cluster access and a small per-test template database helper.
-- [ ] Remove obsolete environment guard, manual data-directory cleanup, and
+- [x] (2026-06-25) Remove obsolete environment guard, manual data-directory
+      cleanup, and
   manual worker-build code.
-- [ ] Move `pg_worker` preparation into Makefile and CI/tooling, or document
+- [x] (2026-06-25) Move `pg_worker` preparation into Makefile and CI/tooling,
+      or document
   why the implementation deliberately keeps tests self-contained.
-- [ ] Update developer documentation to describe the new test workflow.
-- [ ] Run formatting, Markdown, lint, and test gates.
-- [ ] Commit the completed adoption work with a clear commit message.
+- [x] (2026-06-25) Update developer documentation to describe the new test
+      workflow.
+- [x] (2026-06-25) Run formatting, Markdown, lint, and test gates.
+- [x] (2026-06-25) Commit the completed adoption work with a clear commit
+      message.
+- [x] (2026-06-25) Address review follow-up by making the run-id suffix
+      portable,
+  adding the sticky bit to `PG_EMBED_BASE`, and refreshing stale execplan
+  discovery text.
+- [x] (2026-06-25) Re-run deterministic validation and CodeRabbit after the
+      review
+  fixes.
 
 ## Surprises & discoveries
 
-- Observation: No implementation has started yet.
-  Evidence: this plan is in `DRAFT` status. Impact: implementation agents must
-  update this section with actual discoveries rather than treating it as
-  historical record.
+- Observation: implementation has completed and the plan has been updated as a
+  living document. Evidence: the status is `IMPLEMENTED`, the progress log
+  records completed implementation and review-fix milestones, and this section
+  records findings discovered during execution. Impact: future agents should
+  treat the notes below as current implementation evidence, not
+  pre-implementation placeholders.
+
+- Observation: `Makefile` already contains a `prepare-pg-worker` target and
+  `make test` already exports `PG_EMBEDDED_WORKER` from
+  `$(CURDIR)/target/pg_worker`. Evidence: the implementation branch starts at
+  commit `461b23f`, where this tooling is already present. Impact: Stage 6
+  should verify and, if necessary, refine the existing target rather than
+  introducing a duplicate worker preparation path.
+
+- Observation: the baseline focused PostgreSQL test passed before the fixture
+  refactor. Evidence: `cargo test --all-features --test postgres_recursive`
+  passed 8 tests in
+  `/tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: implementation can proceed without treating embedded PostgreSQL
+  startup as an environmental blocker.
+
+- Observation: the red-stage regression test failed for the expected
+  architecture reason before the helper migration. Evidence:
+  `/tmp/postgres-recursive-red-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  contains `expected &TestCluster, found &ClusterHandle` for
+  `templated_database(cluster)`. Impact: the test proved the local helper still
+  depended on the per-test cluster guard shape before the green change.
+
+- Observation: after removing Rust-side worker preparation, the first
+  `make prepare-pg-worker` attempt failed because `Cargo.lock` still listed
+  removed direct dev-dependencies and the Makefile recipe continued after an
+  empty metadata result. Evidence:
+  `/tmp/prepare-pg-worker-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  initially showed
+  `the lock file ... needs to be updated but --locked was passed` and then an
+  empty manifest-path failure. Impact: `Cargo.lock` was updated minimally to
+  remove only the root package's direct `serde_json` and `toml` entries, and
+  the Makefile target now uses `set -e` plus a non-empty manifest-path check.
+
+- Observation: the green-stage focused PostgreSQL test passed after the shared
+  cluster migration. Evidence:
+  `cargo test --all-features --test postgres_recursive` passed 4 tests with
+  `PG_EMBEDDED_WORKER` set to `target/pg_worker` in
+  `/tmp/postgres-recursive-green-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the shared handle, per-test template-cloned databases, and existing
+  sync and async recursive CTE coverage work together.
+
+- Observation: after the shared-cluster process exited once, subsequent
+  PostgreSQL tests failed under the upstream root default path with
+  `failed to connect to admin database`, while no live PostgreSQL process or
+  `/var/tmp/pg-embed-1000/data` directory remained. A fixed target-local
+  `PG_RUNTIME_DIR` and `PG_DATA_DIR` passed once, then failed the same way on a
+  later process run. A unique target-local base directory passed the focused
+  rerun. Evidence:
+  `/tmp/postgres-recursive-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  and
+  `/tmp/postgres-recursive-debug-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  captured the repeated failure, while
+  `/tmp/postgres-recursive-unique-dirs-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`
+  captured the passing unique-directory run. Impact: Makefile now supplies
+  `PG_RUNTIME_DIR` and `PG_DATA_DIR` under a fresh
+  `target/pg-embed-runs/<run-id>` base for each `make test` invocation, without
+  reintroducing Rust-side env guards or manual data deletion.
+
+- Observation: the first `make test` gate after introducing run ids failed
+  before Cargo tests because `PG_EMBED_RUN_ID ?= $(shell ...)` recomputed on
+  each recursive Make variable expansion. Evidence:
+  `/tmp/test-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out` showed
+  `mkdir` and `chmod` targeting different run ids. Impact: the run id now uses
+  an immediate conditional assignment, preserving explicit overrides while
+  keeping all paths stable within a single `make` invocation.
+
+- Observation: the full post-migration gate set passed after stabilizing the
+  Makefile run id. Evidence: `make fmt`, `make check-fmt`, `make markdownlint`,
+  `make nixie`, `make lint`, and `make test` passed in
+  `/tmp/fmt-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/check-fmt-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/markdownlint-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/nixie-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  `/tmp/lint-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`,
+  and
+  `/tmp/test-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the shared-cluster implementation is ready for review.
+
+- Observation: review follow-up found that the discovery note still described a
+  pre-implementation state, `PG_EMBED_RUN_ID` depended on non-portable `shuf`,
+  and `PG_EMBED_BASE` was world-writable without a sticky bit. Evidence:
+  `make test` passed with a timestamp-plus-shell-PID run id and `chmod 1777` in
+  `/tmp/test-review-fixes-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the review findings were valid and fixed with a narrow Makefile and
+  execplan update.
+
+- Observation: the review-fix branch state passed deterministic validation and
+  CodeRabbit review. Evidence: `make fmt`, `make check-fmt`,
+  `make markdownlint`, `make nixie`, `make lint`, `make test`,
+  `git diff --check`, and `coderabbit review --agent` passed after commit
+  `642ea9a`, with CodeRabbit reporting 0 findings. Impact: the implementation
+  status can be recorded as complete in this plan.
 
 ## Decision Log
 
@@ -161,21 +273,62 @@ conflict in `Decision Log`, and ask for direction.
   test-runtime architecture decision with operational consequences for root
   agents, CI, and local debugging. Date/Author: 2026-06-25, planning agent.
 
+- Decision: Treat the user approval in this task as authorization to execute
+  the plan even though the document was originally left in `DRAFT`. Rationale:
+  the request explicitly asks to proceed with implementation and to keep this
+  execplan up to date. Date/Author: 2026-06-25, implementation agent.
+
+- Decision: Keep the asynchronous PostgreSQL coverage as a synchronous
+  `#[test]` with an internal Tokio runtime instead of enabling
+  `pg-embed-setup-unpriv`'s `async-api` feature. Rationale: the shared
+  synchronous cluster handle already supports the async Diesel connection by
+  exposing the temporary database URL, so enabling another upstream feature
+  would add feature surface without deleting meaningful local code.
+  Date/Author: 2026-06-25, implementation agent.
+
+- Decision: Harden the existing `prepare-pg-worker` target rather than adding
+  another worker preparation path. Rationale: the target already builds the
+  locked `pg_worker` binary and exports it through `make test`; adding `set -e`
+  and checking that `cargo metadata` returned a manifest path prevents the
+  recipe from continuing after deterministic setup failures. Date/Author:
+  2026-06-25, implementation agent.
+
+- Decision: Configure `PG_RUNTIME_DIR` and `PG_DATA_DIR` in Makefile test
+  tooling rather than in Rust tests, and allocate a unique target-local base per
+  `make test` invocation. Rationale: upstream defaults under `/var/tmp` and a
+  fixed target-local path failed on repeated root-capable runs in this
+  workspace, while a unique target-local base passed and is easier to inspect.
+  Keeping the setting in Makefile preserves explicit tooling ownership and
+  avoids restoring `EnvVarGuard`, data-directory deletion, or Rust-side worker
+  setup. Date/Author: 2026-06-25, implementation agent.
+
 ## Outcomes & retrospective
 
-No implementation outcome exists yet. At completion, summarize which local
-helpers were deleted, which upstream APIs replaced them, what happened to
-root-agent worker setup, and whether the focused PostgreSQL test runtime
-improved.
+The PostgreSQL integration tests now use `pg-embed-setup-unpriv` v0.5.1's shared
+`ClusterHandle` test support and per-test temporary databases cloned from the
+existing template. The local `TestCluster` helper, environment guard, Rust-side
+worker build path, and direct `serde_json`/`toml` dev-dependencies were deleted.
+
+Root-capable test support moved to Makefile-owned setup: `prepare-pg-worker`
+builds the locked upstream `pg_worker`, `make test` exports the worker path,
+and each full test invocation receives unique runtime and data directories under
+`target/pg-embed-runs/<run-id>`. This kept embedded PostgreSQL startup
+reproducible across repeated process runs in this workspace without adding
+manual Rust-side data cleanup.
+
+The focused PostgreSQL test count dropped from 8 to 4 because the local helper
+unit tests disappeared. Behavioural coverage remains over sync PostgreSQL,
+async PostgreSQL, non-recursive CTEs, and template-cloned database isolation.
 
 ## Context and orientation
 
 This repository is the Rust crate `diesel-cte-ext`. PostgreSQL integration
-tests live in `tests/postgres_recursive.rs`. That file currently imports
-`tests/test_helpers.rs`, configures `PG_RUNTIME_DIR`, `PG_DATA_DIR`, and
-`PG_PASSWORD`, builds `pg_worker` when running as `root`, starts
-`TestCluster::new()` in the `embedded_cluster` rstest fixture, and creates a
-per-test `TemporaryDatabase` from a fixed template named `cte_ext_template`.
+tests live in `tests/postgres_recursive.rs`. Before this implementation, that
+file imported `tests/test_helpers.rs`, configured `PG_RUNTIME_DIR`,
+`PG_DATA_DIR`, and `PG_PASSWORD`, built `pg_worker` when running as `root`,
+started `TestCluster::new()` in the `embedded_cluster` rstest fixture, and
+created a per-test `TemporaryDatabase` from a fixed template named
+`cte_ext_template`.
 
 The dependency is already:
 
@@ -183,39 +336,37 @@ The dependency is already:
 pg-embed-setup-unpriv = { version = "0.5.1", features = ["diesel-support"] }
 ```
 
-The current code has already adopted:
+The implemented code now uses:
 
-- `TestCluster`.
 - `TemporaryDatabase`.
 - `ensure_template_exists`.
 - `temporary_database_from_template`.
 - `diesel_connection()`.
+- `test_support::shared_cluster_handle()`.
+- `ClusterHandle`.
 - The `diesel-support` feature.
+- Makefile-managed `pg_worker` preparation.
 
-The current code has not fully adopted:
+The implemented code deliberately does not use:
 
 - upstream rstest fixtures such as `test_support::test_cluster` or
-  `shared_test_cluster`;
-- upstream process-shared cluster handles such as
-  `test_support::shared_cluster_handle()`;
-- v0.5.0 default `CleanupMode::DataOnly` and partial data-directory recovery
-  as replacements for local data-directory deletion;
-- v0.5.1 first-class `pg_worker` distribution through normal tooling.
+  `shared_test_cluster`, because direct `shared_cluster_handle()` access fits
+  the existing template helper shape;
+- the upstream `async-api` feature, because the synchronous shared handle
+  already provides database URLs that the async Diesel test can use.
 
 Important local files:
 
 - `Cargo.toml` declares the dev-dependency and features.
-- `tests/postgres_recursive.rs` contains the PostgreSQL tests, the local
-  `embedded_cluster` fixture, manual worker build helpers, and template
-  database helper.
-- `tests/test_helpers.rs` contains `EnvVarGuard`, env-var mutation helpers,
-  data-directory cleanup, `.pgpass` cleanup, and related unit tests.
-- `tests/env_var_guard.rs` tests behaviour that should disappear if
-  `EnvVarGuard` is removed.
+- `tests/postgres_recursive.rs` contains the PostgreSQL tests and the small
+  template database helper built on `ClusterHandle`.
+- `tests/test_helpers.rs` was deleted because upstream shared-cluster support
+  replaced the local harness helper.
+- `tests/env_var_guard.rs` was deleted because `EnvVarGuard` was removed.
 - `Makefile` defines `make check-fmt`, `make lint`, `make test`,
-  `make fmt`, `make markdownlint`, and `make nixie`.
-- `.github/workflows/ci.yml` currently runs formatting, Markdown lint, lint,
-  and coverage-backed tests but does not explicitly prepare `pg_worker`.
+  `make fmt`, `make markdownlint`, `make nixie`, and `prepare-pg-worker`.
+- `.github/workflows/ci.yml` runs the existing formatting, Markdown lint, lint,
+  and coverage-backed tests.
 - `docs/developers-guide.md` should describe the adopted testing workflow.
 - `docs/pg-embed-setup-unpriv-users-guide.md` already records the upstream
   v0.5.1 guide and should be linked rather than duplicated.
@@ -281,7 +432,7 @@ The focused command is:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 If this command fails before any edits because embedded PostgreSQL cannot
@@ -497,50 +648,50 @@ git status --short --branch
 Expected branch:
 
 ```plaintext
-update-pg-embedded-docs
+pg-embed-setup-unpriv-v0-5-1-adoption
 ```
 
 Baseline focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Red-stage focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-red-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-red-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Green-stage focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-green-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-green-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Full quality gates:
 
 ```bash
 set -o pipefail; make check-fmt \
-  | tee /tmp/check-fmt-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/check-fmt-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make markdownlint \
-  | tee /tmp/markdownlint-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/markdownlint-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make nixie \
-  | tee /tmp/nixie-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/nixie-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make lint \
-  | tee /tmp/lint-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/lint-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make test \
-  | tee /tmp/test-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/test-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 If Markdown files changed, run:
 
 ```bash
 set -o pipefail; make fmt \
-  | tee /tmp/fmt-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/fmt-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 git diff --check
 ```
 

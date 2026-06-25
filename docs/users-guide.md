@@ -169,20 +169,24 @@ let parts = RecursiveParts::new(
 
 ## Testing with `pg_embedded_setup_unpriv`
 
-The integration tests under `tests/` rely on
-`pg_embedded_setup_unpriv::TestCluster` to provision PostgreSQL without manual
-privileges. Running `make test` triggers the helper to:
+The PostgreSQL integration tests use `pg_embedded_setup_unpriv` to run embedded
+PostgreSQL without requiring a system PostgreSQL service. A test process starts
+one shared embedded cluster handle, and each PostgreSQL test receives its own
+temporary database cloned from a template. This keeps database state isolated
+without paying the cost of starting a new server for every test.
 
-1. Stage PostgreSQL binaries and a writable data directory under the current
-   user's home.
-2. Launch the server before each test module executes.
-3. Configure `PGPASSFILE`, `TZ`, and related environment variables so Diesel and
-   libpq clients authenticate automatically.
-4. Shut the cluster down once the `TestCluster` guard drops, preventing leaked
-   `postmaster` processes between tests.
+Use `make test` for the normal workflow. The Makefile runs `prepare-pg-worker`,
+builds the locked `pg_worker` helper, exports `PG_EMBEDDED_WORKER`, and creates
+a unique writable runtime base under `target/pg-embed-runs/<run-id>`.
+`PG_RUNTIME_DIR` and `PG_DATA_DIR` live under that base, which is created with
+the sticky bit set, so the helper can use it safely.
 
-The `tests/postgres_recursive.rs` module demonstrates how to wrap the guard in
-an `rstest` fixture and propagate failures through the test signature instead
-of calling `unwrap`. This pattern should be reused when authoring new tests so
-the harness can skip gracefully on machines that cannot start PostgreSQL (for
-example, when `tzdata` is missing).
+When bypassing `make test`, unprivileged `cargo test` runs may use the upstream
+defaults. Root-capable runs must prepare `pg_worker` first and export
+`PG_EMBEDDED_WORKER` themselves; run `make prepare-pg-worker`, then set
+`PG_EMBEDDED_WORKER=target/pg_worker`.
+
+The suite deliberately does not use an external PostgreSQL test URL. Embedded
+PostgreSQL keeps local, Continuous Integration, and sandboxed agent runs on the
+same lifecycle and authentication path, which makes failures easier to
+reproduce across environments.
