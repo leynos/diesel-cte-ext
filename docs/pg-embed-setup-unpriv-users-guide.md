@@ -341,6 +341,8 @@ assert!(std::ptr::eq(cluster, cluster2));
 
 **When to use each fixture:**
 
+**Table 1:** Fixture selection for `pg-embed-setup-unpriv` test clusters
+
 | Fixture               | Use case                                          |
 | --------------------- | ------------------------------------------------- |
 | `test_cluster`        | Tests that modify cluster-level settings or state |

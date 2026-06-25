@@ -417,33 +417,34 @@ necessary tests.
 ### Stage 6: move worker preparation into tooling
 
 Add a Makefile target similar in spirit to `wildside` but smaller. The target
-should install or copy `pg_worker` into `target/pg_worker`, then run tests with
-`PG_EMBEDDED_WORKER` set. Use the existing Makefile variables and style.
+must build `pg_worker` from the `pg-embed-setup-unpriv` dependency resolved by
+the locked workspace, copy the resulting binary into `target/pg_worker`, and
+run the standard test path with `PG_EMBEDDED_WORKER` set. Use the existing
+Makefile variables and style.
 
 The intended shape is:
 
 ```make
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
-PG_WORKER_INSTALL_ROOT ?= $(CURDIR)/target/pg-worker-root
-PG_EMBED_SETUP_UNPRIV_VERSION ?= 0.5.1
+PG_WORKER_PROFILE ?= dev
+PG_WORKER_BUILD_DIR ?= debug
 
 prepare-pg-worker:
 	mkdir -p "$$(dirname "$(PG_WORKER_PATH)")"
-	if command -v pg_worker >/dev/null 2>&1; then \
-	  install -m 0755 "$$(command -v pg_worker)" "$(PG_WORKER_PATH)"; \
-	else \
-	  cargo install --locked --root "$(PG_WORKER_INSTALL_ROOT)" \
-	    --version "$(PG_EMBED_SETUP_UNPRIV_VERSION)" --bin pg_worker \
-	    pg-embed-setup-unpriv; \
-	  install -m 0755 "$(PG_WORKER_INSTALL_ROOT)/bin/pg_worker" \
-	    "$(PG_WORKER_PATH)"; \
-	fi
+	manifest_path="$$($(CARGO) metadata --format-version 1 --locked | \
+	  jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)')"; \
+	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker \
+	  --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target"; \
+	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" \
+	  "$(PG_WORKER_PATH)"
 ```
 
 Update `make test` or add a PostgreSQL-aware prerequisite so the standard test
 path prepares the worker before tests. Keep the implementation minimal: this
 repository does not need `wildside`'s full binary cache warm-up script unless
-CI download time or rate limits prove it necessary.
+CI download time or rate limits prove it necessary. Do not add a separate
+`cargo install` fallback: the worker used by tests must come from the locked
+dependency graph being tested.
 
 Update `.github/workflows/ci.yml` only if required for the Makefile change. The
 preferred CI shape is to keep invoking `make test`, allowing the Makefile to
