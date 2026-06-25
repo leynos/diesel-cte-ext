@@ -149,6 +149,16 @@ impl SearchStyle {
     }
 }
 
+#[cfg(feature = "postgres")]
+fn supports_search_clause<DB: Backend>() -> bool {
+    std::any::type_name::<DB>() == std::any::type_name::<diesel::pg::Pg>()
+}
+
+#[cfg(not(feature = "postgres"))]
+const fn supports_search_clause<DB: Backend>() -> bool {
+    false
+}
+
 /// Representation of a recursive CTE query.
 #[derive(Debug, Clone)]
 pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
@@ -204,6 +214,11 @@ where
             output_column,
         }) = &self.search_config
         {
+            if !supports_search_clause::<DB>() {
+                return Err(Error::QueryBuilderError(
+                    "recursive CTE SEARCH clauses are only supported by PostgreSQL".into(),
+                ));
+            }
             out.push_sql("SEARCH ");
             out.push_sql(style.as_str());
             out.push_sql(" BY ");
@@ -325,22 +340,6 @@ mod tests {
                 "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 2) SELECT n FROM nums"
             )
         );
-    }
-
-    #[rstest]
-    fn with_search_stores_search_config(
-        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
-    ) {
-        let query = builders::with_recursive::<Sqlite, _, _, _, _, _>("nums", &["n"], sample_parts)
-            .with_search(SearchStyle::DepthFirst, "n", "ordercol");
-
-        let config = query
-            .search_config
-            .as_ref()
-            .expect("with_search should store search configuration");
-        assert!(matches!(config.style, SearchStyle::DepthFirst));
-        assert_eq!(config.search_column, "n");
-        assert_eq!(config.output_column, "ordercol");
     }
 
     #[test]

@@ -115,6 +115,10 @@ mod tests {
     use std::marker::PhantomData;
 
     #[cfg(feature = "sqlite")]
+    use diesel::Connection;
+    #[cfg(feature = "sqlite")]
+    use diesel::RunQueryDsl;
+    #[cfg(feature = "sqlite")]
     use diesel::sqlite::Sqlite;
 
     #[cfg(feature = "postgres")]
@@ -156,6 +160,29 @@ mod tests {
                 "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
             )
         );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest]
+    fn sqlite_backend_rejects_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+    ) {
+        let mut conn =
+            diesel::sqlite::SqliteConnection::establish(":memory:").expect("open SQLite memory db");
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, "n", "ordercol");
+
+        match query.load::<i32>(&mut conn) {
+            Err(err) => {
+                assert!(matches!(err, diesel::result::Error::QueryBuilderError(_)));
+                assert!(
+                    err.to_string()
+                        .contains("SEARCH clauses are only supported by PostgreSQL")
+                );
+            }
+            Ok(rows) => panic!("expected SQLite search-order query to fail, saw {rows:?}"),
+        }
     }
 
     #[cfg(feature = "sqlite")]
