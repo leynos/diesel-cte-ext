@@ -15,7 +15,7 @@ PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
 PG_WORKER_BUILD_DIR ?= debug
 ifndef PG_EMBED_RUN_ID
-PG_EMBED_RUN_ID := $(shell date +%s)-$(shell shuf -i 100000-999999 -n 1)
+PG_EMBED_RUN_ID := $(shell printf '%s-%s' "$$(date +%s)" $$$$)
 endif
 PG_EMBED_BASE ?= $(CURDIR)/target/pg-embed-runs/$(PG_EMBED_RUN_ID)
 PG_RUNTIME_DIR ?= $(PG_EMBED_BASE)/runtime
@@ -31,7 +31,7 @@ clean: ## Remove build artifacts
 
 test: prepare-pg-worker ## Run tests with warnings treated as errors
 	mkdir -p "$(PG_EMBED_BASE)"
-	chmod 0777 "$(PG_EMBED_BASE)"
+	chmod 1777 "$(PG_EMBED_BASE)"
 	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
 
 prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests

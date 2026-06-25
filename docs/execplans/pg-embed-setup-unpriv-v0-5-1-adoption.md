@@ -146,10 +146,12 @@ conflict in `Decision Log`, and ask for direction.
 
 ## Surprises & discoveries
 
-- Observation: No implementation has started yet.
-  Evidence: this plan is in `DRAFT` status. Impact: implementation agents must
-  update this section with actual discoveries rather than treating it as
-  historical record.
+- Observation: implementation has started and the plan is being maintained as a
+  living document. Evidence: the status is `IN PROGRESS`, the progress log
+  records completed implementation milestones, and this section now records
+  findings discovered during execution. Impact: future agents should treat the
+  notes below as current implementation evidence, not pre-implementation
+  placeholders.
 
 - Observation: `Makefile` already contains a `prepare-pg-worker` target and
   `make test` already exports `PG_EMBEDDED_WORKER` from
@@ -227,6 +229,14 @@ conflict in `Decision Log`, and ask for direction.
   and
   `/tmp/test-rerun-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
   Impact: the shared-cluster implementation is ready for review.
+
+- Observation: review follow-up found that the discovery note still described a
+  pre-implementation state, `PG_EMBED_RUN_ID` depended on non-portable `shuf`,
+  and `PG_EMBED_BASE` was world-writable without a sticky bit. Evidence:
+  `make test` passed with a timestamp-plus-shell-PID run id and `chmod 1777` in
+  `/tmp/test-review-fixes-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: the review findings were valid and fixed with a narrow Makefile and
+  execplan update.
 
 ## Decision Log
 
