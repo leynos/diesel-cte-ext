@@ -179,7 +179,7 @@ Use `make test` for the normal workflow. The Makefile runs `prepare-pg-worker`,
 builds the locked `pg_worker` helper, exports `PG_EMBEDDED_WORKER`, and creates
 a unique writable runtime base under `target/pg-embed-runs/<run-id>`.
 `PG_RUNTIME_DIR` and `PG_DATA_DIR` live under that base, which is created with
-the sticky bit set so the helper can use it safely.
+the sticky bit set, so the helper can use it safely.
 
 When bypassing `make test`, unprivileged `cargo test` runs may use the upstream
 defaults. Root-capable runs must prepare `pg_worker` first and export

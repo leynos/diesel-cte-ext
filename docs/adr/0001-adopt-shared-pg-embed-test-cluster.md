@@ -1,4 +1,4 @@
-# 0001. Adopt Shared pg-embed Test Cluster
+# 0001. Adopt shared pg-embed test cluster
 
 Status: Accepted
 
@@ -8,7 +8,7 @@ Date: 2026-06-25
 
 In the context of PostgreSQL-backed integration tests for `diesel-cte-ext`,
 facing slow per-test embedded cluster startup, duplicated bootstrap code, and
-root-agent worker setup that should be explicit, we decided for one
+root-agent worker setup that should be explicit, this project adopts one
 `pg-embed-setup-unpriv` shared embedded PostgreSQL cluster per test process,
 accessed through `test_support::shared_cluster_handle()`, plus per-test
 `TemporaryDatabase` values cloned from a template database, and against per-test

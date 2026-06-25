@@ -311,8 +311,8 @@ worker build path, and direct `serde_json`/`toml` dev-dependencies were deleted.
 
 Root-capable test support moved to Makefile-owned setup: `prepare-pg-worker`
 builds the locked upstream `pg_worker`, `make test` exports the worker path,
-and each full test invocation receives a unique target-local runtime/data base
-under `target/pg-embed-runs/<run-id>`. This kept embedded PostgreSQL startup
+and each full test invocation receives unique runtime and data directories under
+`target/pg-embed-runs/<run-id>`. This kept embedded PostgreSQL startup
 reproducible across repeated process runs in this workspace without adding
 manual Rust-side data cleanup.
 

@@ -30,22 +30,26 @@ cluster avoids repeated PostgreSQL bootstrap work, while each
 The fixture architecture is recorded in
 [`docs/adr/0001-adopt-shared-pg-embed-test-cluster.md`](adr/0001-adopt-shared-pg-embed-test-cluster.md).
 
-Use `make test` for the supported local test workflow. The target builds the
-locked `pg_worker` binary from the `pg-embed-setup-unpriv` dependency into
-`target/pg_worker`, exports `PG_EMBEDDED_WORKER`, and then runs
-`cargo test --all-targets --all-features`. This keeps root-agent runs aligned
-with CI and avoids hidden worker builds inside Rust test code.
+Use `make test` for the supported local test workflow. The target uses `jq` to
+locate the locked `pg-embed-setup-unpriv` dependency manifest, builds its
+`pg_worker` binary into `target/pg_worker`, exports `PG_EMBEDDED_WORKER`, and
+then runs `cargo test --all-targets --all-features`. This keeps root-agent runs
+aligned with CI and avoids hidden worker builds inside Rust test code.
 
-For the focused PostgreSQL integration test, run:
+For the focused PostgreSQL integration test as an unprivileged user, run:
 
 ```bash
-set -o pipefail; PG_EMBEDDED_WORKER="${PWD}/target/pg_worker" \
-  cargo test --all-features --test postgres_recursive
+cargo test --all-features --test postgres_recursive
 ```
 
-Run `make prepare-pg-worker` first when executing that focused command as
-`root`. Unprivileged `cargo test` invocations can use the upstream defaults,
-but root invocations that bypass `make test` must provide `PG_EMBEDDED_WORKER`.
+Root invocations that bypass `make test` must prepare and export
+`PG_EMBEDDED_WORKER` themselves:
+
+```bash
+make prepare-pg-worker
+PG_EMBEDDED_WORKER="${PWD}/target/pg_worker" \
+  cargo test --all-features --test postgres_recursive
+```
 
 This crate does not currently support external PostgreSQL test URLs. The test
 suite relies on embedded PostgreSQL so local, CI and sandboxed agent runs use
