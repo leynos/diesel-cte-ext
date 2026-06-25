@@ -32,7 +32,6 @@ macro_rules! impl_with_recursive_methods {
             Body: QueryFragment<Self::Backend>,
             ColSpec: Into<Columns<Cols>>,
         {
-            let _ = self;
             builders::$fn_name::<Self::Backend, Cols, _, _, _, _>(cte_name, columns, parts)
         }
     };
@@ -74,7 +73,6 @@ pub trait RecursiveCTEExt {
         Body: QueryFragment<Self::Backend>,
         ColSpec: Into<Columns<Cols>>,
     {
-        let _ = self;
         builders::with_cte::<Self::Backend, Cols, _, _, _>(cte_name, columns, parts)
     }
 }
@@ -110,7 +108,10 @@ impl<B> RecursiveCTEExt for SyncConnectionWrapper<diesel::sqlite::SqliteConnecti
 mod tests {
     use super::*;
     use crate::{SearchStyle, builders::RecursiveParts, test_support::normalise_debug_sql};
-    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
+    use diesel::{
+        debug_query, dsl::sql, expression::SqlLiteral, query_builder::QueryFragment,
+        sql_types::Integer,
+    };
     use rstest::{fixture, rstest};
     use std::marker::PhantomData;
 
@@ -128,6 +129,9 @@ mod tests {
         All,
         Distinct,
     }
+
+    const EMPTY_SEARCH_COLUMNS: &[&str] = &[];
+    const DUPLICATE_SEARCH_COLUMNS: &[&str] = &["n", "n"];
 
     #[fixture]
     fn sample_parts()
@@ -263,6 +267,30 @@ mod tests {
             sql,
             "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SEARCH BREADTH FIRST BY \"n\", \"parent_id\" SET \"ordercol\" SELECT n FROM nums"
         );
+    }
+
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    #[case::empty(EMPTY_SEARCH_COLUMNS, "require at least one search column")]
+    #[case::duplicate(DUPLICATE_SEARCH_COLUMNS, "duplicate column name 'n' in CTE")]
+    fn postgres_backend_rejects_invalid_search_column_lists(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] search_columns: &'static [&'static str],
+        #[case] expected_error: &str,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, search_columns, "ordercol");
+        let mut query_builder = diesel::pg::PgQueryBuilder::new();
+
+        match query.to_sql(&mut query_builder, &Pg) {
+            Err(diesel::result::Error::QueryBuilderError(err)) => {
+                assert!(err.to_string().contains(expected_error));
+            }
+            Err(err) => panic!("expected query-builder error, saw {err}"),
+            Ok(()) => panic!("expected invalid search columns to fail SQL rendering"),
+        }
     }
 
     #[test]

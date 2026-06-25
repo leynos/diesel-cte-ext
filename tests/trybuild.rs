@@ -1,5 +1,7 @@
 //! Compile-time checks for the public recursive search-order API.
 
+#![cfg(feature = "postgres")]
+
 #[test]
 fn recursive_search_api_compile_time_contracts() {
     let cases = trybuild::TestCases::new();

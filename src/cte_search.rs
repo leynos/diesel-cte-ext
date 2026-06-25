@@ -1,5 +1,6 @@
 //! Search-order support types for recursive CTE queries.
 
+#[cfg(feature = "postgres")]
 use std::any::TypeId;
 
 use diesel::backend::Backend;

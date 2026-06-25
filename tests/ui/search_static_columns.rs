@@ -1,3 +1,5 @@
+//! Compile-pass UI test for static recursive search-column inputs.
+
 use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts, SearchStyle};
 
