@@ -144,7 +144,7 @@ fn fetch_cargo_metadata() -> Value {
 
 /// Locate the pg-embed-setup-unpriv manifest in cargo metadata.
 fn find_pg_embed_manifest(metadata: &Value, desired_version: &str) -> PathBuf {
-    metadata
+    let package = metadata
         .get("packages")
         .and_then(Value::as_array)
         .into_iter()
@@ -163,18 +163,14 @@ fn find_pg_embed_manifest(metadata: &Value, desired_version: &str) -> PathBuf {
                     package.get("name").and_then(Value::as_str) == Some("pg-embed-setup-unpriv")
                 })
         })
-        .map(|package| {
-            package
-                .get("manifest_path")
-                .and_then(Value::as_str)
-                .map_or_else(
-                    || panic!("pg-embed-setup-unpriv manifest_path missing in metadata"),
-                    PathBuf::from,
-                )
-        })
+        .unwrap_or_else(|| panic!("pg-embed-setup-unpriv not found in cargo metadata packages"));
+
+    package
+        .get("manifest_path")
+        .and_then(Value::as_str)
         .map_or_else(
-            || panic!("pg-embed-setup-unpriv not found in cargo metadata packages"),
-            |path| path,
+            || panic!("pg-embed-setup-unpriv manifest_path missing in metadata"),
+            PathBuf::from,
         )
 }
 

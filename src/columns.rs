@@ -131,7 +131,6 @@ macro_rules! table_columns {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{columns, table_columns};
 
     diesel::table! {
         sample (id) {
