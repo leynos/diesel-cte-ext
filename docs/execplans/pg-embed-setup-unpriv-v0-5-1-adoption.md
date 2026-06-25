@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -115,12 +115,17 @@ conflict in `Decision Log`, and ask for direction.
 
 - [x] (2026-06-25) Drafted the adoption plan from the current harness audit
   and cross-repository findings.
-- [ ] Load the required skills for implementation:
+- [x] (2026-06-25) Load the required skills for implementation:
   `rust-router`, `rust-unit-testing`, `arch-decision-records`, and
   `commit-message`.
-- [ ] Establish the baseline by running the focused PostgreSQL tests and the
+- [x] (2026-06-25) Rename the implementation branch to
+  `pg-embed-setup-unpriv-v0-5-1-adoption`. The matching `origin` branch does
+  not exist yet, so upstream tracking will be set on first push.
+- [x] (2026-06-25) Establish the baseline by running the focused PostgreSQL
+      tests and the
   relevant quality gates.
-- [ ] Create the ADR documenting the shared embedded PostgreSQL test-cluster
+- [x] (2026-06-25) Create the ADR documenting the shared embedded PostgreSQL
+      test-cluster
   decision.
 - [ ] Add the smallest regression test that fails before the fixture
   migration and proves shared-cluster, per-test database isolation.
@@ -141,6 +146,20 @@ conflict in `Decision Log`, and ask for direction.
   update this section with actual discoveries rather than treating it as
   historical record.
 
+- Observation: `Makefile` already contains a `prepare-pg-worker` target and
+  `make test` already exports `PG_EMBEDDED_WORKER` from
+  `$(CURDIR)/target/pg_worker`. Evidence: the implementation branch starts at
+  commit `461b23f`, where this tooling is already present. Impact: Stage 6
+  should verify and, if necessary, refine the existing target rather than
+  introducing a duplicate worker preparation path.
+
+- Observation: the baseline focused PostgreSQL test passed before the fixture
+  refactor. Evidence: `cargo test --all-features --test postgres_recursive`
+  passed 8 tests in
+  `/tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out`.
+  Impact: implementation can proceed without treating embedded PostgreSQL
+  startup as an environmental blocker.
+
 ## Decision Log
 
 - Decision: Target upstream shared-cluster access rather than per-test
@@ -160,6 +179,11 @@ conflict in `Decision Log`, and ask for direction.
   Rationale: choosing shared embedded PostgreSQL plus template databases is a
   test-runtime architecture decision with operational consequences for root
   agents, CI, and local debugging. Date/Author: 2026-06-25, planning agent.
+
+- Decision: Treat the user approval in this task as authorization to execute
+  the plan even though the document was originally left in `DRAFT`. Rationale:
+  the request explicitly asks to proceed with implementation and to keep this
+  execplan up to date. Date/Author: 2026-06-25, implementation agent.
 
 ## Outcomes & retrospective
 
@@ -281,7 +305,7 @@ The focused command is:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 If this command fails before any edits because embedded PostgreSQL cannot
@@ -497,50 +521,50 @@ git status --short --branch
 Expected branch:
 
 ```plaintext
-update-pg-embedded-docs
+pg-embed-setup-unpriv-v0-5-1-adoption
 ```
 
 Baseline focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-baseline-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Red-stage focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-red-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-red-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Green-stage focused test:
 
 ```bash
 set -o pipefail; cargo test --all-features --test postgres_recursive \
-  | tee /tmp/postgres-recursive-green-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/postgres-recursive-green-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 Full quality gates:
 
 ```bash
 set -o pipefail; make check-fmt \
-  | tee /tmp/check-fmt-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/check-fmt-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make markdownlint \
-  | tee /tmp/markdownlint-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/markdownlint-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make nixie \
-  | tee /tmp/nixie-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/nixie-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make lint \
-  | tee /tmp/lint-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/lint-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 set -o pipefail; make test \
-  | tee /tmp/test-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/test-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 ```
 
 If Markdown files changed, run:
 
 ```bash
 set -o pipefail; make fmt \
-  | tee /tmp/fmt-diesel-cte-ext-update-pg-embedded-docs.out
+  | tee /tmp/fmt-diesel-cte-ext-pg-embed-setup-unpriv-v0-5-1-adoption.out
 git diff --check
 ```
 

@@ -22,5 +22,34 @@ unprivileged execution paths aligned, preserves deterministic environment
 variables such as `PGPASSFILE` and `TZDIR`, and makes failures easier to
 diagnose in Continuous Integration (CI) and agent sandboxes.
 
+PostgreSQL integration tests use one shared embedded cluster per test process
+and create one template-cloned temporary database for each test. The shared
+cluster avoids repeated PostgreSQL bootstrap work, while each
+`TemporaryDatabase` keeps mutable database state isolated between tests.
+
+The fixture architecture is recorded in
+[`docs/adr/0001-adopt-shared-pg-embed-test-cluster.md`](adr/0001-adopt-shared-pg-embed-test-cluster.md).
+
+Use `make test` for the supported local test workflow. The target builds the
+locked `pg_worker` binary from the `pg-embed-setup-unpriv` dependency into
+`target/pg_worker`, exports `PG_EMBEDDED_WORKER`, and then runs
+`cargo test --all-targets --all-features`. This keeps root-agent runs aligned
+with CI and avoids hidden worker builds inside Rust test code.
+
+For the focused PostgreSQL integration test, run:
+
+```bash
+set -o pipefail; PG_EMBEDDED_WORKER="${PWD}/target/pg_worker" \
+  cargo test --all-features --test postgres_recursive
+```
+
+Run `make prepare-pg-worker` first when executing that focused command as
+`root`. Unprivileged `cargo test` invocations can use the upstream defaults,
+but root invocations that bypass `make test` must provide `PG_EMBEDDED_WORKER`.
+
+This crate does not currently support external PostgreSQL test URLs. The test
+suite relies on embedded PostgreSQL so local, CI and sandboxed agent runs use
+the same lifecycle and cleanup behaviour.
+
 For usage details, see
 [`docs/pg-embed-setup-unpriv-users-guide.md`](pg-embed-setup-unpriv-users-guide.md).
