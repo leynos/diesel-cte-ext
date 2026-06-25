@@ -128,8 +128,10 @@ async fn up_to_five_async() -> diesel::QueryResult<Vec<i32>> {
 
 ## Defining the search order
 
-Set the search order of recursive CTEs (breadth or depth first) by chaining `with_search`
-onto `with_recursive` or `with_recursive_not_all`.
+Set the search order of recursive CTEs (breadth or depth first) by chaining
+`with_search` onto `with_recursive` or `with_recursive_not_all`.
+Pass a single column name or a static list of column names to control the
+`SEARCH ... BY` ordering expression.
 
 ```rust,no_run
 use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
@@ -147,7 +149,7 @@ fn reachable_nodes(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
             )),
             sql::<Integer>("SELECT node_id FROM graph ORDER BY ordercol"),
         ),
-    ).with_search(SearchStyle::DepthFirst, "node_id", "ordercol")
+    ).with_search(SearchStyle::DepthFirst, &["node_id"], "ordercol")
         .load(conn)
 }
 ```

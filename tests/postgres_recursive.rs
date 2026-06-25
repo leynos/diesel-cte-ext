@@ -141,7 +141,7 @@ fn recursive_search_order_uses_postgres_search_clause(
                 sql::<Integer>("SELECT id FROM tree ORDER BY ordercol"),
             ),
         )
-        .with_search(style, "id", "ordercol"),
+        .with_search(style, &["id", "parent_id"], "ordercol"),
         &mut conn,
     )?;
 

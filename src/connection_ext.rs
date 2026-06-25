@@ -249,6 +249,22 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    fn postgres_backend_builds_multi_column_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, &["n", "parent_id"], "ordercol");
+        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SEARCH BREADTH FIRST BY \"n\", \"parent_id\" SET \"ordercol\" SELECT n FROM nums"
+        );
+    }
+
     #[test]
     fn connection_types_implement_recursive_ext() {
         fn assert_impl<T: RecursiveCTEExt>() {}

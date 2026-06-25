@@ -9,6 +9,7 @@ pub mod builders;
 pub mod columns;
 pub mod connection_ext;
 pub mod cte;
+mod cte_search;
 pub mod macros;
 #[cfg(test)]
 pub(crate) mod test_support;
@@ -30,7 +31,9 @@ pub use columns::Columns;
 pub use connection_ext::RecursiveCTEExt;
 /// Marker trait implemented by Diesel backends that can run recursive CTEs.
 pub use cte::RecursiveBackend;
+/// Column list accepted by recursive CTE search ordering.
+pub use cte_search::SearchColumnList;
 /// The type of search style to use for recursive CTEs.
-pub use cte::SearchStyle;
+pub use cte_search::SearchStyle;
 /// Wrapper for embedding Diesel fragments inside macro-driven queries.
 pub use macros::QueryPart;

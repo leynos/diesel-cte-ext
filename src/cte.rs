@@ -12,7 +12,12 @@ use diesel::{
     result::{Error, QueryResult},
 };
 
-use crate::columns::Columns;
+use crate::{
+    columns::Columns,
+    cte_search::{
+        SearchColumnList, SearchColumnNames, SearchConfig, SearchStyle, supports_search_clause,
+    },
+};
 
 macro_rules! impl_cte_traits {
     ($name:ident<$($gen:ident),*>, $body_ty:ident) => {
@@ -71,6 +76,33 @@ where
     Ok(())
 }
 
+fn push_search_identifiers<DB>(
+    out: &mut AstPass<'_, '_, DB>,
+    names: SearchColumnNames,
+) -> QueryResult<()>
+where
+    DB: Backend,
+{
+    match names {
+        SearchColumnNames::Single(name) => out.push_identifier(name),
+        SearchColumnNames::List(column_names) => {
+            if column_names.is_empty() {
+                return Err(Error::QueryBuilderError(
+                    "recursive CTE SEARCH clauses require at least one search column".into(),
+                ));
+            }
+            ensure_unique_columns(column_names)?;
+            for (index, name) in column_names.iter().enumerate() {
+                if index > 0 {
+                    out.push_sql(", ");
+                }
+                out.push_identifier(name)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 fn ensure_unique_columns(names: &[&str]) -> QueryResult<()> {
     let mut seen = BTreeSet::new();
     for name in names {
@@ -123,42 +155,6 @@ impl UnionKind {
     }
 }
 
-/// Define the search mode for the CTE
-#[derive(Debug, Clone)]
-pub(crate) struct SearchConfig {
-    pub(crate) style: SearchStyle,
-    pub(crate) search_column: &'static str,
-    pub(crate) output_column: &'static str,
-}
-
-/// Define the search mode to tell the DB to use when scanning the recursive CTE.
-#[derive(Debug, Clone, Copy)]
-pub enum SearchStyle {
-    /// Tells the DB to perform a breadth first scan of the recursive CTE
-    BreadthFirst,
-    /// Tells the DB to perform a depth first scan of the recursive CTE.
-    DepthFirst,
-}
-
-impl SearchStyle {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::BreadthFirst => "BREADTH FIRST",
-            Self::DepthFirst => "DEPTH FIRST",
-        }
-    }
-}
-
-#[cfg(feature = "postgres")]
-fn supports_search_clause<DB: Backend>() -> bool {
-    std::any::type_name::<DB>() == std::any::type_name::<diesel::pg::Pg>()
-}
-
-#[cfg(not(feature = "postgres"))]
-const fn supports_search_clause<DB: Backend>() -> bool {
-    false
-}
-
 /// Representation of a recursive CTE query.
 #[derive(Debug, Clone)]
 pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
@@ -175,16 +171,19 @@ pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
 impl<DB: Backend, Cols, Seed, Step, Body> WithRecursive<DB, Cols, Seed, Step, Body> {
     /// Specify the search mode for the recursive CTE.
     #[must_use]
-    pub fn with_search(
+    pub fn with_search<SearchCols>(
         self,
         style: SearchStyle,
-        search_column: &'static str,
+        search_columns: SearchCols,
         output_column: &'static str,
-    ) -> Self {
+    ) -> Self
+    where
+        SearchCols: Into<SearchColumnList>,
+    {
         Self {
             search_config: Some(SearchConfig {
                 style,
-                search_column,
+                search_columns: search_columns.into(),
                 output_column,
             }),
             ..self
@@ -210,7 +209,7 @@ where
         out.push_sql(") ");
         if let Some(SearchConfig {
             style,
-            search_column,
+            search_columns,
             output_column,
         }) = &self.search_config
         {
@@ -222,7 +221,7 @@ where
             out.push_sql("SEARCH ");
             out.push_sql(style.as_str());
             out.push_sql(" BY ");
-            out.push_identifier(search_column)?;
+            push_search_identifiers(&mut out, search_columns.names())?;
             out.push_sql(" SET ");
             out.push_identifier(output_column)?;
             out.push_sql(" ");
