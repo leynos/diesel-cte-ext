@@ -12,7 +12,7 @@ root-agent worker setup that should be explicit, this project adopts one
 `pg-embed-setup-unpriv` shared embedded PostgreSQL cluster per test process,
 accessed through `test_support::shared_cluster_handle()`, plus per-test
 `TemporaryDatabase` values cloned from a template database, and against per-test
-`TestCluster::new()`, local ownership of `PG_RUNTIME_DIR`, `PG_DATA_DIR` and
+`TestCluster::new()`, local ownership of `PG_RUNTIME_DIR`, `PG_DATA_DIR`, and
 `PG_PASSWORD`, Rust test-code Cargo metadata parsing for `pg_worker`, copying
 downstream custom shutdown wrappers, and an external PostgreSQL URL
 abstraction, to achieve faster tests with database-level isolation and fewer
