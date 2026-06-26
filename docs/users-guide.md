@@ -157,6 +157,51 @@ async fn parent_category_ids_async(
 }
 ```
 
+
+## DSL-built CTEs
+
+When a recursive step references the CTE itself, declare a `table!` schema
+whose name and columns match the CTE. Then allow that synthetic CTE table to
+appear beside the base table so Diesel can type-check the join used by the
+recursive step.
+
+```rust,no_run
+use diesel::{allow_tables_to_appear_in_same_query, prelude::*, table};
+use diesel_cte_ext::RecursiveParts;
+
+table! {
+    categories (id) {
+        id -> Integer,
+        parent_category_id -> Nullable<Integer>,
+    }
+}
+
+table! {
+    parents (id) {
+        id -> Nullable<Integer>,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(categories, parents);
+
+let parts = RecursiveParts::new(
+    categories::table
+        .select(categories::parent_category_id)
+        .filter(categories::id.eq(4)),
+    categories::table
+        .select(categories::parent_category_id)
+        .inner_join(parents::table.on(parents::id.assume_not_null().eq(categories::id))),
+    parents::table
+        .select(parents::id.assume_not_null())
+        .filter(parents::id.is_not_null()),
+);
+```
+
+Pass those parts to `with_recursive` or `with_recursive_not_all` with the same
+CTE name and column list used by the synthetic schema. The construction also
+works with `diesel-async`; call `get_results(...).await` or `load(...).await`
+on the async connection instead of shipping a separate query shape.
+
 ## Defining the search order
 
 Set the search order of recursive CTEs (breadth or depth first) by chaining
