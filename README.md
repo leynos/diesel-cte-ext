@@ -93,9 +93,12 @@ Run the ready-to-go examples after enabling the relevant backend feature:
 ```bash
 cargo run --example sqlite_fibonacci
 cargo run --example sqlite_directory
+cargo run --example sqlite_dsl_recursive
 ```
 
-Both examples use in-memory SQLite so they are quick to run repeatedly.
+These examples use in-memory SQLite so they are quick to run repeatedly.
+`sqlite_dsl_recursive` builds the recursive CTE through Diesel's typed DSL
+rather than raw SQL fragments.
 
 ## Testing
 
