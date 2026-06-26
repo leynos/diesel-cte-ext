@@ -6,6 +6,8 @@ use diesel::{
     dsl::sql,
     sql_query,
     sql_types::{Bool, Integer, Nullable},
+    allow_tables_to_appear_in_same_query, dsl::sql, prelude::*, sql_types::Bool,
+    sql_types::Integer, table,
 };
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
@@ -27,6 +29,13 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static
 const TEMPLATE_DB_NAME: &str = "cte_ext_template";
 static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+const CREATE_CATEGORIES_TABLE: &str = "CREATE TABLE categories (
+    id BIGINT PRIMARY KEY,
+    parent_category_id BIGINT REFERENCES categories(id)
+)";
+
+const INSERT_CATEGORY_TREE: &str = "INSERT INTO categories (id, parent_category_id)
+    VALUES (1, NULL), (2, 1), (3, 2), (4, 3)";
 fn next_database_name() -> String {
     let id = DB_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("cte_ext_test_{id}")
@@ -127,6 +136,122 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
     if result != 42 {
         return Err("seed CTE did not round-trip 42".into());
     }
+    Ok(())
+}
+
+fn recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
+    table! {
+        categories (id) {
+            id -> BigInt,
+            parent_category_id -> Nullable<BigInt>,
+        }
+    }
+
+    table! {
+        parents (id) {
+            id -> Nullable<BigInt>,
+        }
+    }
+
+    allow_tables_to_appear_in_same_query!(categories, parents);
+
+    let cluster = shared_cluster_handle()?;
+    let temp_db = templated_database(cluster)?;
+    let mut conn = cluster.connection().diesel_connection(temp_db.name())?;
+    DieselRunQueryDsl::execute(diesel::sql_query(CREATE_CATEGORIES_TABLE), &mut conn)?;
+    DieselRunQueryDsl::execute(diesel::sql_query(INSERT_CATEGORY_TREE), &mut conn)?;
+
+    let rows: Vec<i64> = DieselRunQueryDsl::load(
+        conn.with_recursive_not_all(
+            "parents",
+            &["id"],
+            RecursiveParts::new(
+                categories::table
+                    .select(categories::parent_category_id)
+                    .filter(categories::id.eq(4_i64)),
+                categories::table
+                    .select(categories::parent_category_id)
+                    .inner_join(
+                        parents::table.on(parents::id.assume_not_null().eq(categories::id)),
+                    ),
+                parents::table
+                    .select(parents::id.assume_not_null())
+                    .filter(parents::id.is_not_null()),
+            ),
+        ),
+        &mut conn,
+    )?;
+
+    let expected = [3_i64, 2, 1];
+    if rows != expected {
+        return Err(format!("expected {expected:?} but saw {rows:?}").into());
+    }
+
+    Ok(())
+}
+
+fn async_recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
+    use tokio::runtime::Builder;
+
+    table! {
+        categories (id) {
+            id -> BigInt,
+            parent_category_id -> Nullable<BigInt>,
+        }
+    }
+
+    table! {
+        parents (id) {
+            id -> Nullable<BigInt>,
+        }
+    }
+
+    allow_tables_to_appear_in_same_query!(categories, parents);
+
+    let cluster = shared_cluster_handle()?;
+    let temp_db = templated_database(cluster)?;
+    let db_url = temp_db.url().to_owned();
+    let rt = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    rt.block_on(async move {
+        let mut conn = AsyncPgConnection::establish(&db_url).await?;
+        AsyncRunQueryDsl::execute(diesel::sql_query(CREATE_CATEGORIES_TABLE), &mut conn).await?;
+        AsyncRunQueryDsl::execute(diesel::sql_query(INSERT_CATEGORY_TREE), &mut conn).await?;
+
+        let rows: Vec<i64> = AsyncRunQueryDsl::load(
+            conn.with_recursive_not_all(
+                "parents",
+                &["id"],
+                RecursiveParts::new(
+                    categories::table
+                        .select(categories::parent_category_id)
+                        .filter(categories::id.eq(4_i64)),
+                    categories::table
+                        .select(categories::parent_category_id)
+                        .inner_join(
+                            parents::table.on(parents::id.assume_not_null().eq(categories::id)),
+                        ),
+                    parents::table
+                        .select(parents::id.assume_not_null())
+                        .filter(parents::id.is_not_null()),
+                ),
+            ),
+            &mut conn,
+        )
+        .await?;
+
+        let expected = [3_i64, 2, 1];
+        if rows != expected {
+            return Err(format!("expected {expected:?} but saw {rows:?}").into());
+        }
+
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
+    })?;
+
     Ok(())
 }
 
