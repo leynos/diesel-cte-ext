@@ -13,7 +13,7 @@ MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
-PG_WORKER_BUILD_DIR ?= debug
+PG_WORKER_BUILD_DIR = $(if $(filter dev,$(PG_WORKER_PROFILE)),debug,$(PG_WORKER_PROFILE))
 ifndef PG_EMBED_RUN_ID
 PG_EMBED_RUN_ID := $(shell printf '%s-%s' "$$(date +%s)" $$$$)
 endif
@@ -40,9 +40,9 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 	manifest_path="$$( \
 		$(CARGO) metadata --format-version 1 --locked | \
 		jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)' \
-	)"; \
-	test -n "$$manifest_path"; \
-	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS); \
+	)" && \
+	test -n "$$manifest_path" && \
+	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
 	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" "$(PG_WORKER_PATH)"
 
 target/%/$(TARGET): ## Build binary in debug or release mode
