@@ -32,7 +32,6 @@ macro_rules! impl_with_recursive_methods {
             Body: QueryFragment<Self::Backend>,
             ColSpec: Into<Columns<Cols>>,
         {
-            let _ = self;
             builders::$fn_name::<Self::Backend, Cols, _, _, _, _>(cte_name, columns, parts)
         }
     };
@@ -74,7 +73,6 @@ pub trait RecursiveCTEExt {
         Body: QueryFragment<Self::Backend>,
         ColSpec: Into<Columns<Cols>>,
     {
-        let _ = self;
         builders::with_cte::<Self::Backend, Cols, _, _, _>(cte_name, columns, parts)
     }
 }
@@ -109,11 +107,18 @@ impl<B> RecursiveCTEExt for SyncConnectionWrapper<diesel::sqlite::SqliteConnecti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{builders::RecursiveParts, test_support::normalise_debug_sql};
-    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
+    use crate::{SearchStyle, builders::RecursiveParts, test_support::normalise_debug_sql};
+    use diesel::{
+        debug_query, dsl::sql, expression::SqlLiteral, query_builder::QueryFragment,
+        sql_types::Integer,
+    };
     use rstest::{fixture, rstest};
     use std::marker::PhantomData;
 
+    #[cfg(feature = "sqlite")]
+    use diesel::Connection;
+    #[cfg(feature = "sqlite")]
+    use diesel::RunQueryDsl;
     #[cfg(feature = "sqlite")]
     use diesel::sqlite::Sqlite;
 
@@ -124,6 +129,9 @@ mod tests {
         All,
         Distinct,
     }
+
+    const EMPTY_SEARCH_COLUMNS: &[&str] = &[];
+    const DUPLICATE_SEARCH_COLUMNS: &[&str] = &["n", "n"];
 
     #[fixture]
     fn sample_parts()
@@ -156,6 +164,29 @@ mod tests {
                 "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
             )
         );
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[rstest]
+    fn sqlite_backend_rejects_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+    ) {
+        let mut conn =
+            diesel::sqlite::SqliteConnection::establish(":memory:").expect("open SQLite memory db");
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, "n", "ordercol");
+
+        match query.load::<i32>(&mut conn) {
+            Err(err) => {
+                assert!(matches!(err, diesel::result::Error::QueryBuilderError(_)));
+                assert!(
+                    err.to_string()
+                        .contains("SEARCH clauses are only supported by PostgreSQL")
+                );
+            }
+            Ok(rows) => panic!("expected SQLite search-order query to fail, saw {rows:?}"),
+        }
     }
 
     #[cfg(feature = "sqlite")]
@@ -198,6 +229,68 @@ mod tests {
                 "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 {union_op} SELECT n + 1 FROM nums WHERE n < 5) SELECT n FROM nums"
             )
         );
+    }
+
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    #[case::breadth_first(SearchStyle::BreadthFirst, "BREADTH FIRST")]
+    #[case::depth_first(SearchStyle::DepthFirst, "DEPTH FIRST")]
+    fn postgres_backend_builds_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] style: SearchStyle,
+        #[case] expected_style: &str,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(style, "n", "ordercol");
+        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            format!(
+                "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SEARCH {expected_style} BY \"n\" SET \"ordercol\" SELECT n FROM nums"
+            )
+        );
+    }
+
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    fn postgres_backend_builds_multi_column_search_order_sql(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, &["n", "parent_id"], "ordercol");
+        let sql = normalise_debug_sql(&debug_query::<Pg, _>(&query).to_string());
+        assert_eq!(
+            sql,
+            "WITH RECURSIVE \"nums\" (\"n\") AS (SELECT 1 UNION ALL SELECT n + 1 FROM nums WHERE n < 5) SEARCH BREADTH FIRST BY \"n\", \"parent_id\" SET \"ordercol\" SELECT n FROM nums"
+        );
+    }
+
+    #[cfg(feature = "postgres")]
+    #[rstest]
+    #[case::empty(EMPTY_SEARCH_COLUMNS, "require at least one search column")]
+    #[case::duplicate(DUPLICATE_SEARCH_COLUMNS, "duplicate column name 'n' in CTE")]
+    fn postgres_backend_rejects_invalid_search_column_lists(
+        sample_parts: RecursiveParts<SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>,
+        #[case] search_columns: &'static [&'static str],
+        #[case] expected_error: &str,
+    ) {
+        let conn = DummyConn::<Pg>::default();
+        let query = conn
+            .with_recursive("nums", &["n"], sample_parts)
+            .with_search(SearchStyle::BreadthFirst, search_columns, "ordercol");
+        let mut query_builder = diesel::pg::PgQueryBuilder::new();
+
+        match query.to_sql(&mut query_builder, &Pg) {
+            Err(diesel::result::Error::QueryBuilderError(err)) => {
+                assert!(err.to_string().contains(expected_error));
+            }
+            Err(err) => panic!("expected query-builder error, saw {err}"),
+            Ok(()) => panic!("expected invalid search columns to fail SQL rendering"),
+        }
     }
 
     #[test]

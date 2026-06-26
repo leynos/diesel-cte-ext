@@ -1,5 +1,32 @@
 # Developer guide
 
+## Contributor toolchain
+
+The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`.
+Run `rustup toolchain install` from the repository root after changing
+`rust-toolchain.toml` so local language-server, formatting, and linting
+behaviour stays aligned with Continuous Integration (CI).
+
+## Recursive search ordering
+
+Recursive CTE search ordering is exposed through `SearchStyle` and
+`WithRecursive::with_search`. `SearchStyle` is public because callers choose
+between breadth-first and depth-first traversal. `SearchConfig` stays
+crate-private because it is only the builder's stored rendering state; callers
+should not construct or inspect it directly.
+
+`with_search` accepts either one static column name or a static list of column
+names. The static requirement matches the rest of the builder API, which stores
+identifier names by reference and lets Diesel quote them during SQL rendering.
+The renderer rejects empty and duplicate search-column lists before emitting
+SQL.
+
+PostgreSQL supports the SQL-standard `SEARCH ... BY ... SET ...` clause, so the
+query fragment renders it only for `diesel::pg::Pg`. SQLite does not support
+`SEARCH` or `CYCLE`, and other backends should not receive silently unsupported
+syntax. The backend gate therefore returns a query-builder error when
+`search_config` is present for any non-PostgreSQL backend.
+
 ## PostgreSQL test support
 
 This crate uses `pg-embed-setup-unpriv` for PostgreSQL-backed integration tests

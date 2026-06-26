@@ -1,0 +1,5 @@
+error[E0432]: unresolved import `diesel_cte_ext::SearchConfig`
+ --> tests/ui/search_config_is_private.rs:3:5
+  |
+3 | use diesel_cte_ext::SearchConfig;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `SearchConfig` in the root

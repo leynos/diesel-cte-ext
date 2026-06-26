@@ -12,7 +12,12 @@ use diesel::{
     result::{Error, QueryResult},
 };
 
-use crate::columns::Columns;
+use crate::{
+    columns::Columns,
+    cte_search::{
+        SearchColumnList, SearchColumnNames, SearchConfig, SearchStyle, supports_search_clause,
+    },
+};
 
 macro_rules! impl_cte_traits {
     ($name:ident<$($gen:ident),*>, $body_ty:ident) => {
@@ -69,6 +74,33 @@ where
     }
     out.push_sql(")");
     Ok(())
+}
+
+fn push_search_identifiers<DB>(
+    out: &mut AstPass<'_, '_, DB>,
+    names: SearchColumnNames,
+) -> QueryResult<()>
+where
+    DB: Backend,
+{
+    match names {
+        SearchColumnNames::Single(name) => out.push_identifier(name),
+        SearchColumnNames::List(column_names) => {
+            if column_names.is_empty() {
+                return Err(Error::QueryBuilderError(
+                    "recursive CTE SEARCH clauses require at least one search column".into(),
+                ));
+            }
+            ensure_unique_columns(column_names)?;
+            for (index, name) in column_names.iter().enumerate() {
+                if index > 0 {
+                    out.push_sql(", ");
+                }
+                out.push_identifier(name)?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn ensure_unique_columns(names: &[&str]) -> QueryResult<()> {
@@ -132,12 +164,46 @@ pub struct WithRecursive<DB: Backend, Cols, Seed, Step, Body> {
     pub(crate) step: Step,
     pub(crate) body: Body,
     pub(crate) union_kind: UnionKind,
+    pub(crate) search_config: Option<SearchConfig>,
     pub(crate) _marker: std::marker::PhantomData<DB>,
+}
+
+impl<DB: Backend, Cols, Seed, Step, Body> WithRecursive<DB, Cols, Seed, Step, Body> {
+    /// Specify recursive CTE search ordering for the `PostgreSQL` backend.
+    ///
+    /// `style` selects breadth-first or depth-first traversal.
+    /// `search_columns` supplies the column or columns rendered after
+    /// `SEARCH ... BY`, and `output_column` names the generated ordering column
+    /// rendered after `SET`.
+    ///
+    /// The `PostgreSQL` backend is the only supported backend for
+    /// `SEARCH ... BY ... SET`.
+    /// Rendering or executing a searched recursive CTE on another backend fails
+    /// with [`Error::QueryBuilderError`].
+    #[must_use]
+    pub fn with_search<SearchCols>(
+        self,
+        style: SearchStyle,
+        search_columns: SearchCols,
+        output_column: &'static str,
+    ) -> Self
+    where
+        SearchCols: Into<SearchColumnList>,
+    {
+        Self {
+            search_config: Some(SearchConfig {
+                style,
+                search_columns: search_columns.into(),
+                output_column,
+            }),
+            ..self
+        }
+    }
 }
 
 impl<DB, Cols, Seed, Step, Body> QueryFragment<DB> for WithRecursive<DB, Cols, Seed, Step, Body>
 where
-    DB: Backend,
+    DB: Backend + 'static,
     Seed: QueryFragment<DB>,
     Step: QueryFragment<DB>,
     Body: QueryFragment<DB>,
@@ -151,6 +217,25 @@ where
         out.push_sql(self.union_kind.as_sql());
         self.step.walk_ast(out.reborrow())?;
         out.push_sql(") ");
+        if let Some(SearchConfig {
+            style,
+            search_columns,
+            output_column,
+        }) = &self.search_config
+        {
+            if !supports_search_clause::<DB>() {
+                return Err(Error::QueryBuilderError(
+                    "recursive CTE SEARCH clauses are only supported by PostgreSQL".into(),
+                ));
+            }
+            out.push_sql("SEARCH ");
+            out.push_sql(style.as_str());
+            out.push_sql(" BY ");
+            push_search_identifiers(&mut out, search_columns.names())?;
+            out.push_sql(" SET ");
+            out.push_identifier(output_column)?;
+            out.push_sql(" ");
+        }
         self.body.walk_ast(out.reborrow())
     }
 }

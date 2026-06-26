@@ -112,7 +112,7 @@ tuple_column_names!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 tuple_column_names!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 tuple_column_names!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 
-/// Builds a [`Columns`](crate::columns::Columns) value from explicit column paths.
+/// Builds a [`Columns`] value from explicit column paths.
 #[macro_export]
 macro_rules! columns {
     ($($col:path),+ $(,)?) => {
@@ -120,7 +120,7 @@ macro_rules! columns {
     };
 }
 
-/// Builds a [`Columns`](crate::columns::Columns) value from every column on a Diesel table.
+/// Builds a [`Columns`] value from every column on a Diesel table.
 #[macro_export]
 macro_rules! table_columns {
     ($table:path) => {
