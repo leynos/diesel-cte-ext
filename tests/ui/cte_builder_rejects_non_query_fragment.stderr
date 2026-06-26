@@ -1,0 +1,37 @@
+error[E0277]: `String` is no valid SQL fragment for the `Sqlite` backend
+  --> tests/ui/cte_builder_rejects_non_query_fragment.rs:11:9
+   |
+ 8 |       let _query = conn.with_recursive(
+   |                         -------------- required by a bound introduced by this call
+...
+11 | /         RecursiveParts::new(
+12 | |             String::from("SELECT 1"),
+13 | |             sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
+14 | |             sql::<Integer>("SELECT n FROM series ORDER BY n"),
+15 | |         ),
+   | |_________^ the trait `QueryFragment<Sqlite>` is not implemented for `String`
+   |
+   = note: this usually means that the `Sqlite` database system does not support
+           this SQL syntax
+   = help: the following other types implement trait `QueryFragment<DB, SP>`:
+             `&T` implements `QueryFragment<DB>`
+             `()` implements `QueryFragment<DB>`
+             `(T, T1)` implements `QueryFragment<__DB>`
+             `(T, T1, T2)` implements `QueryFragment<__DB>`
+             `(T, T1, T2, T3)` implements `QueryFragment<__DB>`
+             `(T, T1, T2, T3, T4)` implements `QueryFragment<__DB>`
+             `(T, T1, T2, T3, T4, T5)` implements `QueryFragment<__DB>`
+             `(T, T1, T2, T3, T4, T5, T6)` implements `QueryFragment<__DB>`
+           and $N others
+note: required by a bound in `diesel_cte_ext::RecursiveCTEExt::with_recursive`
+  --> src/connection_ext.rs
+   |
+   | /     impl_with_recursive_methods!(
+   | |         with_recursive,
+   | |         -------------- required by a bound in this associated function
+   | |         WithRecursive,
+   | |         "builders::with_recursive",
+   | |         "Create a [`WithRecursiv...
+   | |     );
+   | |_____^ required by this bound in `RecursiveCTEExt::with_recursive`
+   = note: this error originates in the macro `impl_with_recursive_methods` (in Nightly builds, run with -Z macro-backtrace for more info)

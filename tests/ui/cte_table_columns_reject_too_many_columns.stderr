@@ -1,0 +1,26 @@
+error[E0277]: the trait bound `(oversized::columns::c01, oversized::columns::c02, oversized::columns::c03, oversized::columns::c04, oversized::columns::c05, oversized::columns::c06, oversized::columns::c07, oversized::columns::c08, oversized::columns::c09, oversized::columns::c10, oversized::columns::c11, oversized::columns::c12, oversized::columns::c13, oversized::columns::c14, oversized::columns::c15, oversized::columns::c16, oversized::columns::c17): ColumnNames` is not satisfied
+  --> tests/ui/cte_table_columns_reject_too_many_columns.rs:27:20
+   |
+27 |     let _columns = diesel_cte_ext::table_columns!(oversized::table);
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+   = help: the trait `ColumnNames` is not implemented for `(oversized::columns::c01, oversized::columns::c02, oversized::columns::c03, oversized::columns::c04, oversized::columns::c05, oversized::columns::c06, oversized::columns::c07, oversized::columns::c08, oversized::columns::c09, oversized::columns::c10, oversized::columns::c11, oversized::columns::c12, oversized::columns::c13, oversized::columns::c14, oversized::columns::c15, oversized::columns::c16, oversized::columns::c17)`
+   = help: the following other types implement trait `ColumnNames`:
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+             (A, B, C, D, E, F, G, H)
+             (A, B, C, D, E, F, G, H, I)
+           and $N others
+note: required by a bound in `Columns::<()>::for_table`
+  --> src/columns.rs
+   |
+   |     pub fn for_table<Tbl>() -> Columns<<Tbl as Table>::AllColumns>
+   |            --------- required by a bound in this associated function
+...
+   |         <Tbl as Table>::AllColumns: ColumnNames,
+   |                                     ^^^^^^^^^^^ required by this bound in `Columns::<()>::for_table`
+   = note: this error originates in the macro `diesel_cte_ext::table_columns` (in Nightly builds, run with -Z macro-backtrace for more info)
