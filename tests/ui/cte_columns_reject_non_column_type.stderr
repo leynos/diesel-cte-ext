@@ -1,7 +1,7 @@
 error[E0599]: the function or associated item `default` exists for struct `Columns<(PlainType,)>`, but its trait bounds were not satisfied
- --> tests/ui/cte_columns_reject_non_column_type.rs:7:20
+ --> tests/ui/cte_columns_reject_non_column_type.rs:8:20
   |
-7 |     let _columns = diesel_cte_ext::columns!(PlainType);
+8 |     let _columns = diesel_cte_ext::columns!(PlainType);
   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ function or associated item cannot be called on `Columns<(PlainType,)>` due to unsatisfied trait bounds
   |
  ::: src/columns.rs

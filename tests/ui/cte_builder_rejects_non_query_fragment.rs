@@ -4,6 +4,7 @@
 use diesel::{dsl::sql, sql_types::Integer, sqlite::SqliteConnection};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
+/// Attempts to build a recursive CTE with a seed that is not a query fragment.
 fn rejects_non_query_fragment_seed(conn: &SqliteConnection) {
     let _query = conn.with_recursive(
         "series",
@@ -16,4 +17,5 @@ fn rejects_non_query_fragment_seed(conn: &SqliteConnection) {
     );
 }
 
+/// Runs the compile-fail fixture.
 fn main() {}

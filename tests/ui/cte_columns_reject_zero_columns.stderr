@@ -1,7 +1,7 @@
 error: unexpected end of macro invocation
- --> tests/ui/cte_columns_reject_zero_columns.rs:5:20
+ --> tests/ui/cte_columns_reject_zero_columns.rs:6:20
   |
-5 |     let _columns = diesel_cte_ext::columns!();
+6 |     let _columns = diesel_cte_ext::columns!();
   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^ missing tokens in macro arguments
   |
 note: while trying to match meta-variable `$col:path`

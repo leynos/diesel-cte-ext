@@ -3,6 +3,7 @@
 
 struct PlainType;
 
+/// Attempts to build a typed column list from a non-Diesel column type.
 fn main() {
     let _columns = diesel_cte_ext::columns!(PlainType);
 }

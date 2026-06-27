@@ -2,8 +2,8 @@
 
 ## Contributor toolchain
 
-The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`.
-Run `rustup toolchain install` from the repository root after changing
+The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`. Run
+`rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI).
 
@@ -26,6 +26,32 @@ query fragment renders it only for `diesel::pg::Pg`. SQLite does not support
 `SEARCH` or `CYCLE`, and other backends should not receive silently unsupported
 syntax. The backend gate therefore returns a query-builder error when
 `search_config` is present for any non-PostgreSQL backend.
+
+## Compile-fail UI tests
+
+Compile-time contracts for macros and type-level behaviour are covered by the
+`trybuild` harness in `tests/trybuild.rs`. Add CTE-focused fixtures under
+`tests/ui/` with the `cte_` prefix and keep each fixture self-documenting with
+a module comment that states the guarantee being protected.
+
+Use `compile_fail` fixtures for invalid macro invocations, invalid type-level
+column combinations, and builder inputs that should fail Diesel trait bounds at
+compile time. Keep runtime SQL rendering assertions focused on valid behaviour
+in the existing unit and integration tests.
+
+Refresh asserted diagnostics only after deliberately changing the expected
+compiler output:
+
+```bash
+TRYBUILD=overwrite cargo test --test trybuild --all-features
+cargo test --test trybuild --all-features
+```
+
+The 17-column `table_columns!` fixture needs Diesel's `32-column-tables`
+feature enabled for dev builds. Without that feature, Diesel's own `table!`
+macro rejects the table definition before this crate reaches its `ColumnNames`
+boundary. Keep that feature in `[dev-dependencies]` only, so production feature
+selection remains unchanged.
 
 ## PostgreSQL test support
 

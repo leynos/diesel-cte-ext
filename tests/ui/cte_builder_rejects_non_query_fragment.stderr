@@ -1,14 +1,14 @@
 error[E0277]: `String` is no valid SQL fragment for the `Sqlite` backend
-  --> tests/ui/cte_builder_rejects_non_query_fragment.rs:11:9
+  --> tests/ui/cte_builder_rejects_non_query_fragment.rs:12:9
    |
- 8 |       let _query = conn.with_recursive(
+ 9 |       let _query = conn.with_recursive(
    |                         -------------- required by a bound introduced by this call
 ...
-11 | /         RecursiveParts::new(
-12 | |             String::from("SELECT 1"),
-13 | |             sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
-14 | |             sql::<Integer>("SELECT n FROM series ORDER BY n"),
-15 | |         ),
+12 | /         RecursiveParts::new(
+13 | |             String::from("SELECT 1"),
+14 | |             sql::<Integer>("SELECT n + 1 FROM series WHERE n < 10"),
+15 | |             sql::<Integer>("SELECT n FROM series ORDER BY n"),
+16 | |         ),
    | |_________^ the trait `QueryFragment<Sqlite>` is not implemented for `String`
    |
    = note: this usually means that the `Sqlite` database system does not support

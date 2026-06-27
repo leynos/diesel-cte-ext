@@ -1,7 +1,7 @@
 error: no rules expected `,`
-  --> tests/ui/cte_table_columns_reject_extra_argument.rs:11:64
+  --> tests/ui/cte_table_columns_reject_extra_argument.rs:12:64
    |
-11 |     let _columns = diesel_cte_ext::table_columns!(sample::table, sample::id);
+12 |     let _columns = diesel_cte_ext::table_columns!(sample::table, sample::id);
    |                                                                ^ no rules expected this token in macro call
    |
 note: while trying to match meta-variable `$table:path`

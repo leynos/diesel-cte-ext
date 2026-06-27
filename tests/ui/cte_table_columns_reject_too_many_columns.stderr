@@ -1,7 +1,7 @@
 error[E0277]: the trait bound `(oversized::columns::c01, oversized::columns::c02, oversized::columns::c03, oversized::columns::c04, oversized::columns::c05, oversized::columns::c06, oversized::columns::c07, oversized::columns::c08, oversized::columns::c09, oversized::columns::c10, oversized::columns::c11, oversized::columns::c12, oversized::columns::c13, oversized::columns::c14, oversized::columns::c15, oversized::columns::c16, oversized::columns::c17): ColumnNames` is not satisfied
-  --> tests/ui/cte_table_columns_reject_too_many_columns.rs:27:20
+  --> tests/ui/cte_table_columns_reject_too_many_columns.rs:28:20
    |
-27 |     let _columns = diesel_cte_ext::table_columns!(oversized::table);
+28 |     let _columns = diesel_cte_ext::table_columns!(oversized::table);
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
    |
    = help: the trait `ColumnNames` is not implemented for `(oversized::columns::c01, oversized::columns::c02, oversized::columns::c03, oversized::columns::c04, oversized::columns::c05, oversized::columns::c06, oversized::columns::c07, oversized::columns::c08, oversized::columns::c09, oversized::columns::c10, oversized::columns::c11, oversized::columns::c12, oversized::columns::c13, oversized::columns::c14, oversized::columns::c15, oversized::columns::c16, oversized::columns::c17)`

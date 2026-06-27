@@ -7,6 +7,7 @@ diesel::table! {
     }
 }
 
+/// Attempts to invoke `table_columns!` with more than one path.
 fn main() {
     let _columns = diesel_cte_ext::table_columns!(sample::table, sample::id);
 }

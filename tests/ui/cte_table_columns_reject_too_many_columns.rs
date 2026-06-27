@@ -23,6 +23,7 @@ diesel::table! {
     }
 }
 
+/// Attempts to derive typed columns for a table wider than `ColumnNames`.
 fn main() {
     let _columns = diesel_cte_ext::table_columns!(oversized::table);
 }
