@@ -13,7 +13,7 @@ MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
-PG_WORKER_BUILD_DIR = $(if $(filter dev,$(PG_WORKER_PROFILE)),debug,$(PG_WORKER_PROFILE))
+PG_WORKER_BUILD_DIR = $(if $(filter dev test,$(PG_WORKER_PROFILE)),debug,$(if $(filter bench,$(PG_WORKER_PROFILE)),release,$(PG_WORKER_PROFILE)))
 ifndef PG_EMBED_RUN_ID
 PG_EMBED_RUN_ID := $(shell printf '%s-%s' "$$(date +%s)" $$$$)
 endif
