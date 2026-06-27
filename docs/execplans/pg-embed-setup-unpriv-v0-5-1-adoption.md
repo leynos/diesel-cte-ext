@@ -293,6 +293,14 @@ conflict in `Decision Log`, and ask for direction.
   recipe from continuing after deterministic setup failures. Date/Author:
   2026-06-25, implementation agent.
 
+- Decision: Derive the `pg_worker` install source from the selected Cargo
+  profile in Makefile and test that derivation with fake tooling. Rationale:
+  Cargo's built-in `dev` and `test` profiles place binaries under
+  `target/debug`, while `release` and `bench` place binaries under
+  `target/release`; custom profiles continue to use their profile name. The
+  behavioural Makefile test also verifies that an empty `manifest_path` stops
+  before build or install. Date/Author: 2026-06-27, implementation agent.
+
 - Decision: Configure `PG_RUNTIME_DIR` and `PG_DATA_DIR` in Makefile test
   tooling rather than in Rust tests, and allocate a unique target-local base per
   `make test` invocation. Rationale: upstream defaults under `/var/tmp` and a
@@ -578,14 +586,27 @@ The intended shape is:
 ```make
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
-PG_WORKER_BUILD_DIR ?= debug
+PG_WORKER_DEBUG_PROFILES := dev test
+PG_WORKER_RELEASE_PROFILES := release bench
+PG_WORKER_IS_DEBUG_PROFILE = \
+  $(filter $(PG_WORKER_DEBUG_PROFILES),$(PG_WORKER_PROFILE))
+PG_WORKER_IS_RELEASE_PROFILE = \
+  $(filter $(PG_WORKER_RELEASE_PROFILES),$(PG_WORKER_PROFILE))
+PG_WORKER_DEFAULT_BUILD_DIR = \
+  $(if $(PG_WORKER_IS_RELEASE_PROFILE),release,$(PG_WORKER_PROFILE))
+PG_WORKER_BUILD_DIR = \
+  $(if $(PG_WORKER_IS_DEBUG_PROFILE),debug,$(PG_WORKER_DEFAULT_BUILD_DIR))
 
 prepare-pg-worker:
-	mkdir -p "$$(dirname "$(PG_WORKER_PATH)")"
-	manifest_path="$$($(CARGO) metadata --format-version 1 --locked | \
-	  jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)')"; \
+	mkdir -p "$(dir $(PG_WORKER_PATH))"
+	set -e; \
+	manifest_path="$$( \
+	  $(CARGO) metadata --format-version 1 --locked | \
+	  jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)' \
+	)" && \
+	test -n "$$manifest_path" && \
 	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker \
-	  --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target"; \
+	  --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" && \
 	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" \
 	  "$(PG_WORKER_PATH)"
 ```
@@ -597,9 +618,11 @@ CI download time or rate limits prove it necessary. Do not add a separate
 `cargo install` fallback: the worker used by tests must come from the locked
 dependency graph being tested.
 
-Update `.github/workflows/ci.yml` only if required for the Makefile change. The
-preferred CI shape is to keep invoking `make test`, allowing the Makefile to
-own worker preparation.
+Add a focused Makefile behaviour test that exercises the worker profile mapping
+and empty-manifest failure path without performing a real Cargo build. Run that
+test in `.github/workflows/ci.yml` alongside the existing deterministic gates.
+The preferred CI shape is to keep invoking `make test`, allowing the Makefile
+to own worker preparation.
 
 If the implementation decides tests must remain fully self-contained and cannot
 rely on Makefile preparation, record that decision in the ADR and

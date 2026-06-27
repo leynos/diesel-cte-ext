@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie prepare-pg-worker
+.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie prepare-pg-worker test-prepare-pg-worker
 
 
 TARGET ?= libdiesel-cte-ext.rlib
@@ -13,7 +13,12 @@ MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
-PG_WORKER_BUILD_DIR = $(if $(filter dev test,$(PG_WORKER_PROFILE)),debug,$(if $(filter bench,$(PG_WORKER_PROFILE)),release,$(PG_WORKER_PROFILE)))
+PG_WORKER_DEBUG_PROFILES := dev test
+PG_WORKER_RELEASE_PROFILES := release bench
+PG_WORKER_IS_DEBUG_PROFILE = $(filter $(PG_WORKER_DEBUG_PROFILES),$(PG_WORKER_PROFILE))
+PG_WORKER_IS_RELEASE_PROFILE = $(filter $(PG_WORKER_RELEASE_PROFILES),$(PG_WORKER_PROFILE))
+PG_WORKER_DEFAULT_BUILD_DIR = $(if $(PG_WORKER_IS_RELEASE_PROFILE),release,$(PG_WORKER_PROFILE))
+PG_WORKER_BUILD_DIR = $(if $(PG_WORKER_IS_DEBUG_PROFILE),debug,$(PG_WORKER_DEFAULT_BUILD_DIR))
 ifndef PG_EMBED_RUN_ID
 PG_EMBED_RUN_ID := $(shell printf '%s-%s' "$$(date +%s)" $$$$)
 endif
@@ -24,7 +29,7 @@ PG_DATA_DIR ?= $(PG_EMBED_BASE)/data
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
-all: check-fmt lint test ## Perform a comprehensive check of code
+all: check-fmt lint test test-prepare-pg-worker ## Perform a comprehensive check of code
 
 clean: ## Remove build artifacts
 	$(CARGO) clean
@@ -44,6 +49,9 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 	test -n "$$manifest_path" && \
 	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
 	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" "$(PG_WORKER_PATH)"
+
+test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
+	bash tests/prepare_pg_worker_makefile.sh
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)

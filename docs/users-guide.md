@@ -128,15 +128,15 @@ async fn up_to_five_async() -> diesel::QueryResult<Vec<i32>> {
 ## Defining the search order
 
 Set the search order of recursive CTEs (breadth or depth first) by chaining
-`with_search` onto `with_recursive` or `with_recursive_not_all`.
-Pass a single column name or a static list of column names to control the
-`SEARCH ... BY` ordering expression.
+`with_search` onto `with_recursive` or `with_recursive_not_all`. Pass a single
+column name or a static list of column names to control the `SEARCH ... BY`
+ordering expression.
 
 `with_search` is PostgreSQL-only. The builder remains available on recursive
 queries created by `with_recursive` or `with_recursive_not_all`, but `walk_ast`
 rejects a searched recursive CTE for SQLite and other non-PostgreSQL backends
-with `QueryBuilderError` instead of emitting unsupported `SEARCH ... BY ... SET`
-syntax.
+with `QueryBuilderError` instead of emitting unsupported
+`SEARCH ... BY ... SET` syntax.
 
 ```rust,no_run
 use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
