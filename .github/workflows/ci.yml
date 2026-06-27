@@ -28,6 +28,8 @@ jobs:
             !**/dist/**
       - name: Lint
         run: make lint
+      - name: Test pg_worker preparation
+        run: make test-prepare-pg-worker
       - name: Test and Measure Coverage
         uses: leynos/shared-actions/.github/actions/generate-coverage@f9f1c863c8a5bef64aa6779caa746e1a4a6c1ad4
         with:

@@ -2,8 +2,8 @@
 
 ## Contributor toolchain
 
-The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`.
-Run `rustup toolchain install` from the repository root after changing
+The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`. Run
+`rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI).
 
@@ -62,6 +62,20 @@ locate the locked `pg-embed-setup-unpriv` dependency manifest, builds its
 `pg_worker` binary into `target/pg_worker`, exports `PG_EMBEDDED_WORKER`, and
 then runs `cargo test --all-targets --all-features`. This keeps root-agent runs
 aligned with CI and avoids hidden worker builds inside Rust test code.
+
+`prepare-pg-worker` derives the worker install source from `PG_WORKER_PROFILE`
+so the copied binary follows Cargo's built-in output directories:
+
+- `dev` and `test` use `target/debug/pg_worker`;
+- `release` and `bench` use `target/release/pg_worker`;
+- custom profiles use `target/<profile>/pg_worker`.
+
+The recipe validates that `cargo metadata --locked` returned a
+`pg-embed-setup-unpriv` `manifest_path`, then chains manifest lookup, build,
+and install with `&&`. This fail-fast flow prevents a missing manifest or
+failed build from falling through to a misleading install step. Run
+`make test-prepare-pg-worker` to exercise the profile mapping and empty
+manifest error path without performing a real Cargo build.
 
 For the focused PostgreSQL integration test as an unprivileged user, run:
 
