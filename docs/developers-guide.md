@@ -31,8 +31,10 @@ syntax. The backend gate therefore returns a query-builder error when
 
 Compile-time contracts for macros and type-level behaviour are covered by the
 `trybuild` harness in `tests/trybuild.rs`. Add CTE-focused fixtures under
-`tests/ui/` with the `cte_` prefix and keep each fixture self-documenting with
-a module comment that states the guarantee being protected.
+`tests/ui/` with the `cte_` prefix. Keep each fixture self-documenting with a
+`//!` module comment that states the guarantee being protected and `///`
+comments on the fixture functions, including `main`, that name the invalid
+invocation being exercised.
 
 Use `compile_fail` fixtures for invalid macro invocations, invalid type-level
 column combinations, and builder inputs that should fail Diesel trait bounds at
