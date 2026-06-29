@@ -87,7 +87,12 @@ postgres = ["diesel/postgres", "diesel-async/postgres"]
 async = ["dep:diesel-async"]
 
 [dev-dependencies]
-diesel = { version = "2", default-features = false, features = ["sqlite", "postgres", "chrono"] }
+diesel = { version = "2", default-features = false, features = [
+    "sqlite",
+    "postgres",
+    "chrono",
+    "32-column-tables",
+] }
 diesel-async = { version = "0.9", features = ["sqlite", "postgres", "tokio", "async-connection-wrapper"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rstest = "0.26"

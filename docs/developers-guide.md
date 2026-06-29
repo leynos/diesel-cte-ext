@@ -27,6 +27,34 @@ query fragment renders it only for `diesel::pg::Pg`. SQLite does not support
 syntax. The backend gate therefore returns a query-builder error when
 `search_config` is present for any non-PostgreSQL backend.
 
+## Compile-fail UI tests
+
+Compile-time contracts for macros and type-level behaviour are covered by the
+`trybuild` harness in `tests/trybuild.rs`. Add CTE-focused fixtures under
+`tests/ui/` with the `cte_` prefix. Keep each fixture self-documenting with a
+`//!` module comment that states the guarantee being protected and `///`
+comments on the fixture functions, including `main`, that name the invalid
+invocation being exercised.
+
+Use `compile_fail` fixtures for invalid macro invocations, invalid type-level
+column combinations, and builder inputs that should fail Diesel trait bounds at
+compile time. Keep runtime SQL rendering assertions focused on valid behaviour
+in the existing unit and integration tests.
+
+Refresh asserted diagnostics only after deliberately changing the expected
+compiler output:
+
+```bash
+TRYBUILD=overwrite cargo test --test trybuild --all-features
+cargo test --test trybuild --all-features
+```
+
+The 17-column `table_columns!` fixture needs Diesel's `32-column-tables`
+feature enabled for dev builds. Without that feature, Diesel's own `table!`
+macro rejects the table definition before this crate reaches its `ColumnNames`
+boundary. Keep that feature in `[dev-dependencies]` only, so production feature
+selection remains unchanged.
+
 ## PostgreSQL test support
 
 This crate uses `pg-embed-setup-unpriv` for PostgreSQL-backed integration tests
