@@ -157,7 +157,6 @@ async fn parent_category_ids_async(
 }
 ```
 
-
 ## DSL-built CTEs
 
 When a recursive step references the CTE itself, declare a `table!` schema

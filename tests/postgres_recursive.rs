@@ -3,11 +3,12 @@
 
 use diesel::RunQueryDsl as DieselRunQueryDsl;
 use diesel::{
+    allow_tables_to_appear_in_same_query,
     dsl::sql,
+    prelude::*,
     sql_query,
     sql_types::{Bool, Integer, Nullable},
-    allow_tables_to_appear_in_same_query, dsl::sql, prelude::*, sql_types::Bool,
-    sql_types::Integer, table,
+    table,
 };
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
@@ -139,6 +140,7 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
     Ok(())
 }
 
+#[test]
 fn recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
     table! {
         categories (id) {
@@ -190,6 +192,8 @@ fn recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "async")]
+#[test]
 fn async_recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
     use tokio::runtime::Builder;
 
