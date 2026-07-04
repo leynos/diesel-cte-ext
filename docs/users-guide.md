@@ -98,7 +98,8 @@ fn parent_category_ids(
                 ),
             parents::table
                 .select(parents::id.assume_not_null())
-                .filter(parents::id.is_not_null()),
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
         ),
     )
     .load(conn)
@@ -149,7 +150,8 @@ async fn parent_category_ids_async(
                 ),
             parents::table
                 .select(parents::id.assume_not_null())
-                .filter(parents::id.is_not_null()),
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
         ),
     )
     .load(conn)
@@ -192,7 +194,8 @@ let parts = RecursiveParts::new(
         .inner_join(parents::table.on(parents::id.assume_not_null().eq(categories::id))),
     parents::table
         .select(parents::id.assume_not_null())
-        .filter(parents::id.is_not_null()),
+        .filter(parents::id.is_not_null())
+        .order(parents::id.desc()),
 );
 ```
 

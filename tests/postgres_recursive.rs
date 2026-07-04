@@ -69,7 +69,8 @@ macro_rules! parent_chain_recursive_parts {
                 .inner_join(parents::table.on(parents::id.assume_not_null().eq(categories::id))),
             parents::table
                 .select(parents::id.assume_not_null())
-                .filter(parents::id.is_not_null()),
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
         )
     };
 }
