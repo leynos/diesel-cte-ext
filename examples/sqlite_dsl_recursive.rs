@@ -78,6 +78,8 @@ pub fn run_dsl_recursive_example() -> Result<Vec<i32>, Box<dyn std::error::Error
 
 #[cfg(test)]
 mod tests {
+    //! Tests for the typed DSL recursive `SQLite` example.
+
     use super::*;
 
     #[test]
