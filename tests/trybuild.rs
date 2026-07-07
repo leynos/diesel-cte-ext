@@ -18,5 +18,6 @@ fn cte_macro_type_level_compile_time_contracts() {
     // after deliberately changing diagnostics with:
     // `TRYBUILD=overwrite cargo test --test trybuild --all-features`.
     let cases = trybuild::TestCases::new();
-    cases.compile_fail("tests/ui/cte_*.rs");
+    cases.pass("tests/ui/cte_dsl_recursive_parts_type_checks.rs");
+    cases.compile_fail("tests/ui/cte_*reject*.rs");
 }
