@@ -11,6 +11,7 @@ CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
+WHITAKER ?= whitaker
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
 PG_WORKER_PROFILE ?= dev
 PG_WORKER_DEBUG_PROFILES := dev test
@@ -56,9 +57,10 @@ test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
 
-lint: ## Run Clippy with warnings denied
+lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
+	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
