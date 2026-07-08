@@ -1,0 +1,49 @@
+name: Mutation testing
+
+# Thin caller of the shared mutation-testing reusable workflow; caller
+# guide: leynos/shared-actions docs/mutation-cargo-workflow.md.
+# Scheduled runs mutate only files changed within the detection window;
+# manual dispatch runs mutate everything, fanned out across shards. To
+# test a branch, select it in the Actions "Run workflow" control.
+
+on:
+  schedule:
+    - cron: "35 9 * * *" # Daily, 09:35 UTC
+  workflow_dispatch:
+
+# Default the token to no scopes; the job opts in explicitly.
+permissions: {}
+
+# Serialize runs per ref: a dispatch during a scheduled run (or vice
+# versa) queues rather than racing. Runs are informational, so queued
+# runs wait instead of cancelling.
+concurrency:
+  group: mutation-testing-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    permissions:
+      contents: read
+      id-token: write # OIDC workflow-source resolution
+    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@859416a90eb3987b46a57682c5d6b8964ad3f0a6
+    with:
+      # Test-support scaffolding used only by unit tests; its survivors
+      # are noise.
+      exclude-globs: "src/test_support.rs"
+      # Match the repository's canonical test baseline (`make test`
+      # runs --all-targets --all-features) so async- and feature-gated
+      # code compiles and its tests run against mutants. The embedded
+      # PostgreSQL tests self-bootstrap when running unprivileged, so
+      # no database service or worker binary is needed.
+      extra-args: "--all-features"
+      # pg-embed-setup-unpriv generates a random superuser password per
+      # test run while cluster state persists between runs, so a second
+      # plain `cargo test` in the same environment fails to
+      # authenticate ("failed to connect to admin database"). Pinning
+      # PG_PASSWORD keeps every per-mutant test run consistent with the
+      # baseline run's cluster state. The value guards a throwaway
+      # embedded cluster bound to localhost inside the CI job; it is
+      # not a secret.
+      setup-commands: |
+        echo "PG_PASSWORD=cargo-mutants-embedded-pg" >> "$GITHUB_ENV"
