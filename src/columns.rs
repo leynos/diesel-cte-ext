@@ -130,6 +130,8 @@ macro_rules! table_columns {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for CTE column list handling.
+
     use super::*;
 
     diesel::table! {

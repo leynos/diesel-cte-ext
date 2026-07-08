@@ -110,6 +110,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the CTE builder functions.
+
     use super::*;
     use crate::test_support::normalise_debug_sql;
     use diesel::{

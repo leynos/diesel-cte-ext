@@ -106,6 +106,8 @@ impl<B> RecursiveCTEExt for SyncConnectionWrapper<diesel::sqlite::SqliteConnecti
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the connection extension traits.
+
     use super::*;
     use crate::{SearchStyle, builders::RecursiveParts, test_support::normalise_debug_sql};
     use diesel::{

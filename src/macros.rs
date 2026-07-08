@@ -86,6 +86,8 @@ macro_rules! step_query {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for the query-part macros.
+
     use super::QueryPart;
     use crate::test_support::normalise_debug_sql;
     use diesel::{debug_query, dsl::sql, sql_types::Integer, sqlite::Sqlite};
