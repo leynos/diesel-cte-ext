@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie prepare-pg-worker test-prepare-pg-worker
+.PHONY: help all clean test build release lint fmt check-fmt markdownlint nixie prepare-pg-worker test-prepare-pg-worker test-workflow-contracts
 
 
 TARGET ?= libdiesel-cte-ext.rlib
@@ -52,6 +52,9 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 
 test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
 	bash tests/prepare_pg_worker_makefile.sh
+
+test-workflow-contracts: ## Validate the mutation-testing caller contract
+	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
