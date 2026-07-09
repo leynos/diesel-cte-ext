@@ -3,9 +3,12 @@
 
 use diesel::RunQueryDsl as DieselRunQueryDsl;
 use diesel::{
+    allow_tables_to_appear_in_same_query,
     dsl::sql,
+    prelude::*,
     sql_query,
     sql_types::{Bool, Integer, Nullable},
+    table,
 };
 #[cfg(feature = "async")]
 use diesel_async::{AsyncConnection, AsyncPgConnection, RunQueryDsl as AsyncRunQueryDsl};
@@ -26,6 +29,61 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync + 'static
 
 const TEMPLATE_DB_NAME: &str = "cte_ext_template";
 static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+const CREATE_CATEGORIES_TABLE: &str = "CREATE TABLE categories (
+    id BIGINT PRIMARY KEY,
+    parent_category_id BIGINT REFERENCES categories(id)
+)";
+
+const INSERT_CATEGORY_TREE: &str = "INSERT INTO categories (id, parent_category_id)
+    VALUES (1, NULL), (2, 1), (3, 2), (4, 3)";
+
+table! {
+    /// Category fixture rows used by the recursive parent-chain tests.
+    categories (id) {
+        /// Unique category identifier.
+        id -> BigInt,
+        /// Optional parent category identifier.
+        parent_category_id -> Nullable<BigInt>,
+    }
+}
+
+table! {
+    /// Recursive CTE table used by the parent-chain tests.
+    parents (id) {
+        /// Parent category identifier yielded by the recursive CTE.
+        id -> Nullable<BigInt>,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(categories, parents);
+
+macro_rules! parent_chain_recursive_parts {
+    () => {
+        RecursiveParts::new(
+            categories::table
+                .select(categories::parent_category_id)
+                .filter(categories::id.eq(4_i64)),
+            categories::table
+                .select(categories::parent_category_id)
+                .inner_join(parents::table.on(parents::id.assume_not_null().eq(categories::id))),
+            parents::table
+                .select(parents::id.assume_not_null())
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
+        )
+    };
+}
+
+fn assert_parent_chain(rows: Vec<i64>) -> TestResult<()> {
+    let expected = [3_i64, 2, 1];
+    let actual = rows.into_boxed_slice();
+    if actual.as_ref() == expected {
+        return Ok(());
+    }
+
+    Err(format!("expected {expected:?} but saw {actual:?}").into())
+}
 
 fn next_database_name() -> String {
     let id = DB_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -127,6 +185,53 @@ fn non_recursive_cte_returns_seed() -> TestResult<()> {
     if result != 42 {
         return Err("seed CTE did not round-trip 42".into());
     }
+    Ok(())
+}
+
+#[test]
+fn recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
+    let cluster = shared_cluster_handle()?;
+    let temp_db = templated_database(cluster)?;
+    let mut conn = cluster.connection().diesel_connection(temp_db.name())?;
+    DieselRunQueryDsl::execute(diesel::sql_query(CREATE_CATEGORIES_TABLE), &mut conn)?;
+    DieselRunQueryDsl::execute(diesel::sql_query(INSERT_CATEGORY_TREE), &mut conn)?;
+
+    let rows: Vec<i64> = DieselRunQueryDsl::load(
+        conn.with_recursive_not_all("parents", &["id"], parent_chain_recursive_parts!()),
+        &mut conn,
+    )?;
+
+    assert_parent_chain(rows)
+}
+
+#[cfg(feature = "async")]
+#[test]
+fn async_recursive_query_fragments_can_use_diesel_dsl() -> TestResult<()> {
+    use tokio::runtime::Builder;
+
+    let cluster = shared_cluster_handle()?;
+    let temp_db = templated_database(cluster)?;
+    let db_url = temp_db.url().to_owned();
+    let rt = Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
+    rt.block_on(async move {
+        let mut conn = AsyncPgConnection::establish(&db_url).await?;
+        AsyncRunQueryDsl::execute(diesel::sql_query(CREATE_CATEGORIES_TABLE), &mut conn).await?;
+        AsyncRunQueryDsl::execute(diesel::sql_query(INSERT_CATEGORY_TREE), &mut conn).await?;
+
+        let rows: Vec<i64> = AsyncRunQueryDsl::load(
+            conn.with_recursive_not_all("parents", &["id"], parent_chain_recursive_parts!()),
+            &mut conn,
+        )
+        .await?;
+
+        assert_parent_chain(rows)
+    })?;
+
     Ok(())
 }
 
