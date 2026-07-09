@@ -21,9 +21,11 @@ WORKFLOW_PATH = (
     Path(__file__).resolve().parents[2] / ".github" / "workflows" / "mutation-testing.yml"
 )
 
-#: The leynos/shared-actions commit the caller pins. Bump the workflow
-#: and this constant together.
-PINNED_SHA = "859416a90eb3987b46a57682c5d6b8964ad3f0a6"
+#: The leynos/shared-actions commit the caller pins (leynos/shared-actions
+#: PR #334, which adds the `mode: check` coverage gate used by the CI
+#: workflow's coverage steps; the estate keeps a single repo-wide pin).
+#: Bump the workflow and this constant together.
+PINNED_SHA = "927edd45ae77be4251a8a18ca9eb5613a2e32cbd"
 
 EXPECTED_USES = (
     "leynos/shared-actions/.github/workflows/mutation-cargo.yml@" + PINNED_SHA
