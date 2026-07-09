@@ -57,21 +57,49 @@ fn names() -> diesel::QueryResult<Vec<String>> {
 ## Building recursive CTEs
 
 Recursive queries delegate the three constituent fragments (seed, recursive
-step, and final body) to a `RecursiveParts` struct. The builder enforces the
-shape of each fragment, so Diesel can validate the AST at compile time.
+step, and final body) to a `RecursiveParts` struct. Each fragment can be a
+normal Diesel query builder expression, so Diesel validates the AST at compile
+time instead of leaving the CTE body as raw SQL.
 
 ```rust,no_run
-use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
+use diesel::{allow_tables_to_appear_in_same_query, pg::PgConnection, prelude::*, table};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
-fn up_to_five(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
-    conn.with_recursive(
-        "series",
-        &["n"],
+fn parent_category_ids(
+    conn: &mut PgConnection,
+    category_id: i64,
+) -> diesel::QueryResult<Vec<i64>> {
+    table! {
+        categories (id) {
+            id -> BigInt,
+            parent_category_id -> Nullable<BigInt>,
+        }
+    }
+
+    table! {
+        parents (id) {
+            id -> Nullable<BigInt>,
+        }
+    }
+
+    allow_tables_to_appear_in_same_query!(categories, parents);
+
+    conn.with_recursive_not_all(
+        "parents",
+        &["id"],
         RecursiveParts::new(
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>("SELECT n + 1 FROM series WHERE n < 5"),
-            sql::<Integer>("SELECT n FROM series"),
+            categories::table
+                .select(categories::parent_category_id)
+                .filter(categories::id.eq(category_id)),
+            categories::table
+                .select(categories::parent_category_id)
+                .inner_join(
+                    parents::table.on(parents::id.assume_not_null().eq(categories::id)),
+                ),
+            parents::table
+                .select(parents::id.assume_not_null())
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
         ),
     )
     .load(conn)
@@ -79,51 +107,102 @@ fn up_to_five(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
 ```
 
 `with_recursive` renders a recursive `UNION ALL`. Use `with_recursive_not_all`
-when the recursive term should deduplicate at each iteration using `UNION`.
-
-```rust,no_run
-use diesel::{dsl::sql, pg::PgConnection, sql_types::Integer, RunQueryDsl};
-use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
-
-fn reachable_nodes(conn: &mut PgConnection) -> diesel::QueryResult<Vec<i32>> {
-    conn.with_recursive_not_all(
-        "graph",
-        &["node_id"],
-        RecursiveParts::new(
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>(concat!(
-                "SELECT edges.target_id FROM edges ",
-                "INNER JOIN graph ON edges.source_id = graph.node_id"
-            )),
-            sql::<Integer>("SELECT node_id FROM graph ORDER BY node_id"),
-        ),
-    )
-    .load(conn)
-}
-```
+when the recursive term should deduplicate at each iteration using `UNION`, as
+shown above.
 
 Async connections receive the same helpers once the `async` feature is enabled:
 
 ```rust,no_run
-use diesel::{dsl::sql, sql_types::Integer};
+use diesel::{allow_tables_to_appear_in_same_query, prelude::*, table};
 use diesel_async::{AsyncPgConnection, RunQueryDsl};
 use diesel_cte_ext::{RecursiveCTEExt, RecursiveParts};
 
-async fn up_to_five_async() -> diesel::QueryResult<Vec<i32>> {
-    let mut conn = AsyncPgConnection::establish("postgresql://localhost/postgres").await?;
-    conn.with_recursive(
-        "series",
-        &["n"],
+async fn parent_category_ids_async(
+    conn: &mut AsyncPgConnection,
+    category_id: i64,
+) -> diesel::QueryResult<Vec<i64>> {
+    table! {
+        categories (id) {
+            id -> BigInt,
+            parent_category_id -> Nullable<BigInt>,
+        }
+    }
+
+    table! {
+        parents (id) {
+            id -> Nullable<BigInt>,
+        }
+    }
+
+    allow_tables_to_appear_in_same_query!(categories, parents);
+
+    conn.with_recursive_not_all(
+        "parents",
+        &["id"],
         RecursiveParts::new(
-            sql::<Integer>("SELECT 1"),
-            sql::<Integer>("SELECT n + 1 FROM series WHERE n < 5"),
-            sql::<Integer>("SELECT n FROM series"),
+            categories::table
+                .select(categories::parent_category_id)
+                .filter(categories::id.eq(category_id)),
+            categories::table
+                .select(categories::parent_category_id)
+                .inner_join(
+                    parents::table.on(parents::id.assume_not_null().eq(categories::id)),
+                ),
+            parents::table
+                .select(parents::id.assume_not_null())
+                .filter(parents::id.is_not_null())
+                .order(parents::id.desc()),
         ),
     )
-    .load(&mut conn)
+    .load(conn)
     .await
 }
 ```
+
+## DSL-built CTEs
+
+When a recursive step references the CTE itself, declare a `table!` schema
+whose name and columns match the CTE. Then allow that synthetic CTE table to
+appear beside the base table so Diesel can type-check the join used by the
+recursive step.
+
+```rust,no_run
+use diesel::{allow_tables_to_appear_in_same_query, prelude::*, table};
+use diesel_cte_ext::RecursiveParts;
+
+table! {
+    categories (id) {
+        id -> Integer,
+        parent_category_id -> Nullable<Integer>,
+    }
+}
+
+table! {
+    parents (id) {
+        id -> Nullable<Integer>,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(categories, parents);
+
+let parts = RecursiveParts::new(
+    categories::table
+        .select(categories::parent_category_id)
+        .filter(categories::id.eq(4)),
+    categories::table
+        .select(categories::parent_category_id)
+        .inner_join(parents::table.on(parents::id.assume_not_null().eq(categories::id))),
+    parents::table
+        .select(parents::id.assume_not_null())
+        .filter(parents::id.is_not_null())
+        .order(parents::id.desc()),
+);
+```
+
+Pass those parts to `with_recursive` or `with_recursive_not_all` with the same
+CTE name and column list used by the synthetic schema. The construction also
+works with `diesel-async`; call `get_results(...).await` or `load(...).await`
+on the async connection instead of shipping a separate query shape.
 
 ## Defining the search order
 

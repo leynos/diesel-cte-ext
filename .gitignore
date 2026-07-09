@@ -2,3 +2,4 @@ target/
 **/*.rs.bk
 .devcontainer/
 __pycache__/
+.memdb/
