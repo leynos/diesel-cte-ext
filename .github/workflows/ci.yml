@@ -20,6 +20,11 @@ jobs:
           fetch-depth: 0
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
+      - name: Setup uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          python-version: '3.13'
+          enable-cache: true
       - name: Format
         run: make check-fmt
       - name: Markdown lint
@@ -29,6 +34,8 @@ jobs:
             **/*.md
             !**/target/**
             !**/dist/**
+      - name: Spelling
+        run: make spelling
       - name: Cache whitaker-installer
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4.3.0
         with:
@@ -49,11 +56,6 @@ jobs:
           whitaker-installer
       - name: Lint
         run: make lint
-      - name: Setup uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
-        with:
-          python-version: '3.13'
-          enable-cache: true
       - name: Workflow contract tests
         run: make test-workflow-contracts
       - name: Test pg_worker preparation

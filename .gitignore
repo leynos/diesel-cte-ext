@@ -3,3 +3,8 @@ target/
 .devcontainer/
 __pycache__/
 .memdb/
+.coverage
+.typos-oxendict-base.json
+.typos-oxendict-base.toml
+.uv-cache/
+.uv-tools/
