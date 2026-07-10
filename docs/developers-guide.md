@@ -7,6 +7,30 @@ The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`. Run
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI).
 
+## Spelling policy
+
+Run `make markdownlint` to lint Markdown and enforce en-GB-oxendict spelling.
+The target uses the `TYPOS_VERSION` pin in the `Makefile`, tests the policy
+helper, refreshes the shared base dictionary, generates `typos.toml`, and scans
+tracked Markdown files.
+
+The shared dictionary is maintained in `leynos/agent-helper-scripts`. Its
+repository-local cache and freshness metadata are untracked. The helper
+replaces the cache only when the authoritative copy is newer and can reuse a
+valid cached copy while offline. A clean checkout with an unavailable network
+retains the reviewed, tracked `typos.toml` policy.
+
+Do not edit generated entries in `typos.toml`. Put only repository-specific
+proper nouns, quoted upstream titles, fixtures, stems or exclusions in
+`typos.local.toml`, then regenerate with:
+
+```bash
+uv run scripts/generate_typos_config.py
+```
+
+Keep upstream API spellings in inline or fenced code where practical. The
+spelling gate deliberately ignores code spans and fenced code blocks.
+
 ## Recursive search ordering
 
 Recursive CTE search ordering is exposed through `SearchStyle` and
@@ -65,7 +89,7 @@ cluster lifecycle policy through this crate's tests.
 
 The dependency is especially important for sandboxed agentic development. These
 workspaces often run automation as `root`, while PostgreSQL refuses to
-initialise or run as `root`. `pg-embed-setup-unpriv` detects that case,
+initialize or run as `root`. `pg-embed-setup-unpriv` detects that case,
 prepares the runtime and data directories with the permissions PostgreSQL
 expects, and delegates lifecycle commands to a worker helper that drops to the
 `nobody` user. The test harness can therefore keep its original process
