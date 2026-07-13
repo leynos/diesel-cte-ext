@@ -90,7 +90,13 @@ pub(crate) fn supports_search_clause<DB: Backend + 'static>() -> bool {
 }
 
 /// Return whether `DB` supports the SQL-standard recursive `SEARCH` clause.
+// Mutation runs build with `--all-features`, so this `cfg(not(feature =
+// "postgres"))` variant is compiled out and no test in that configuration
+// can observe a mutation of it; the behaviour it guards is asserted by
+// `sqlite_backend_rejects_search_order_sql` in builds without the
+// `postgres` feature. Accepted as configuration-bound; see issue #92.
 #[cfg(not(feature = "postgres"))]
+#[cfg_attr(test, mutants::skip)]
 pub(crate) const fn supports_search_clause<DB: Backend + 'static>() -> bool {
     false
 }

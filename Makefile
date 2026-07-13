@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint fmt check-fmt markdownlint \
+.PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint \
 	nixie prepare-pg-worker spelling spelling-helper-test \
 	test-prepare-pg-worker test-workflow-contracts
 
@@ -70,6 +70,9 @@ lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+
+typecheck: ## Type-check every target with all features enabled
+	$(CARGO) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
