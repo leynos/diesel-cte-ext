@@ -5,7 +5,8 @@
 The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`. Run
 `rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
-behaviour stays aligned with Continuous Integration (CI).
+behaviour stays aligned with Continuous Integration (CI). Run `make typecheck`
+to type-check every target with all features enabled.
 
 ## Spelling policy
 
@@ -50,6 +51,19 @@ query fragment renders it only for `diesel::pg::Pg`. SQLite does not support
 `SEARCH` or `CYCLE`, and other backends should not receive silently unsupported
 syntax. The backend gate therefore returns a query-builder error when
 `search_config` is present for any non-PostgreSQL backend.
+
+## Mutation testing
+
+The scheduled `cargo-mutants` workflow builds with `--all-features`. A mutant
+inside a variant excluded by that feature set cannot be observed by the run,
+even when another supported feature configuration exercises the behaviour.
+
+Use `#[cfg_attr(test, mutants::skip)]` only for such configuration-bound
+mutants. Keep the attribute on the narrowest affected item and add a comment
+that identifies the excluded configuration, the existing behavioural coverage,
+and the tracking issue. The `mutants` dev-dependency exists solely so these
+test-only attributes resolve. Do not skip mutants that can be exercised by the
+workflow's feature set; strengthen the relevant tests instead.
 
 ## Compile-fail UI tests
 
