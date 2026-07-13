@@ -99,3 +99,4 @@ rstest = "0.26"
 pg-embed-setup-unpriv = { version = "0.5.1", features = ["diesel-support"] }
 proptest = "1"
 trybuild = "1"
+mutants = "0.0.4"
