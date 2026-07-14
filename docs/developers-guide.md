@@ -58,6 +58,10 @@ The scheduled `cargo-mutants` workflow builds with `--all-features`. A mutant
 inside a variant excluded by that feature set cannot be observed by the run,
 even when another supported feature configuration exercises the behaviour.
 
+The shared-workflow reference remains pinned to a commit SHA for supply-chain
+integrity. Dependabot manages that SHA; do not duplicate it in tests or
+documentation, because Dependabot updates only the workflow reference.
+
 Use `#[cfg_attr(test, mutants::skip)]` only for such configuration-bound
 mutants. Keep the attribute on the narrowest affected item and add a comment
 that identifies the excluded configuration, the existing behavioural coverage,
