@@ -433,7 +433,7 @@ change is a Rust integration-test fixture refactor. Load
 navigation if available; use `rg` for literal strings and documentation.
 
 Run the current focused tests and quality gates to establish baseline
-behaviour. Record the command outputs in `Artifacts and notes` if failures are
+behaviour. Record the command outputs in `Artefacts and notes` if failures are
 unrelated to this work.
 
 The focused command is:
@@ -508,7 +508,7 @@ use a shared handle. The assertion should fail before the fixture migration and
 pass after it. Remove any temporary expected-failure marker before the green
 commit.
 
-Record the red command and the expected failure in `Artifacts and notes`.
+Record the red command and the expected failure in `Artefacts and notes`.
 
 ### Stage 4: migrate the fixture to upstream shared cluster access
 
@@ -787,7 +787,7 @@ test-code worker builds.
 To roll back an incomplete implementation, revert only the current task's
 uncommitted changes. Do not reset or overwrite unrelated user changes.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Initial audit notes to preserve for the implementation agent:
 
