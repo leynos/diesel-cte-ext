@@ -787,7 +787,7 @@ test-code worker builds.
 To roll back an incomplete implementation, revert only the current task's
 uncommitted changes. Do not reset or overwrite unrelated user changes.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Initial audit notes to preserve for the implementation agent:
 
