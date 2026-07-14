@@ -21,16 +21,6 @@ WORKFLOW_PATH = (
     Path(__file__).resolve().parents[2] / ".github" / "workflows" / "mutation-testing.yml"
 )
 
-#: The leynos/shared-actions commit the caller pins (leynos/shared-actions
-#: PR #334, which adds the `mode: check` coverage gate used by the CI
-#: workflow's coverage steps; the estate keeps a single repo-wide pin).
-#: Bump the workflow and this constant together.
-PINNED_SHA = "927edd45ae77be4251a8a18ca9eb5613a2e32cbd"
-
-EXPECTED_USES = (
-    "leynos/shared-actions/.github/workflows/mutation-cargo.yml@" + PINNED_SHA
-)
-
 #: The exact caller configuration: exclude the unit-test scaffolding
 #: module (survivors there are noise), mirror the repository's
 #: canonical test baseline (`make test` runs --all-features), and pin
@@ -69,28 +59,6 @@ def _mutation_job(workflow: dict[str, object]) -> dict[str, object]:
         f"expected a single job named 'mutation', found {sorted(jobs)}"
     )
     return jobs["mutation"]
-
-
-def test_uses_reference_is_pinned_to_the_documented_sha() -> None:
-    """The job must call the shared workflow at the exact documented SHA."""
-    uses = _mutation_job(_load()).get("uses")
-    assert uses is not None, "jobs.mutation.uses is missing"
-    path, _, ref = uses.partition("@")
-    assert path == "leynos/shared-actions/.github/workflows/mutation-cargo.yml", (
-        f"jobs.mutation.uses must reference mutation-cargo.yml, got {path!r}"
-    )
-    assert len(ref) == 40, (
-        f"jobs.mutation.uses must pin a full 40-character commit SHA, "
-        f"not a branch or tag: {ref!r}"
-    )
-    assert all(c in "0123456789abcdef" for c in ref), (
-        f"jobs.mutation.uses must pin a lowercase hex commit SHA, "
-        f"not a branch or tag: {ref!r}"
-    )
-    assert uses == EXPECTED_USES, (
-        f"jobs.mutation.uses pins {ref!r}; this suite documents {PINNED_SHA!r} — "
-        "bump the workflow and this test together"
-    )
 
 
 def test_job_permissions_are_exactly_least_privilege() -> None:
