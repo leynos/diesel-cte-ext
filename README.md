@@ -1,5 +1,8 @@
 # diesel-cte-ext
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/diesel-cte-ext)
+
 A cheerful toolkit for building recursive and non-recursive Common Table
 Expressions (CTEs) on top of Diesel. The helpers wrap the boilerplate needed to
 assemble `WITH` blocks, keep column metadata tidy, and work with both blocking
