@@ -8,6 +8,9 @@
       "tables": false,
       "headings": false
     },
+    // Changelog release sections legitimately repeat headings such as
+    // "Changed" and "Fixed"; only flag duplicates that share a parent.
+    "MD024": { "siblings_only": true },
     "MD029": { "style": "ordered" }
   },
   "ignores": ["**/.venv/**", ".node_modules/**", "**/node_modules/**", "**/target/**"]
