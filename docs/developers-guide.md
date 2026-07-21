@@ -2,7 +2,11 @@
 
 ## Contributor toolchain
 
-The pinned Rust toolchain includes `rustfmt`, `clippy`, and `rust-analyzer`. Run
+The pinned Rust toolchain is **1.94.0** and includes `rustfmt`, `clippy`, and
+`rust-analyzer`. The 1.94.0 floor comes from the `pg-embed-setup-unpriv` 0.5.2
+test dependency: its transitive crates (`postgresql_embedded` and `sqlx`)
+require that release, so building the `pg_worker` helper or running `make test`
+on an older toolchain fails during dependency resolution. Run
 `rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI). Run `make typecheck`
