@@ -26,7 +26,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-diesel-cte-ext = { version = "0.1", default-features = false, features = [
+diesel-cte-ext = { version = "0.3", default-features = false, features = [
     "postgres",
 ] }
 ```
