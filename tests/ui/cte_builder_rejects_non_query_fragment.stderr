@@ -26,12 +26,15 @@ error[E0277]: `String` is no valid SQL fragment for the `Sqlite` backend
 note: required by a bound in `diesel_cte_ext::RecursiveCTEExt::with_recursive`
   --> src/connection_ext.rs
    |
+   |               Seed: QueryFragment<Self::Backend>,
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `RecursiveCTEExt::with_recursive`
+...
    | /     impl_with_recursive_methods!(
    | |         with_recursive,
    | |         -------------- required by a bound in this associated function
    | |         WithRecursive,
    | |         "builders::with_recursive",
-   | |         "Create a [`WithRecursiv...
+   | |         "Create a [`WithRecursive`] builder ...
    | |     );
-   | |_____^ required by this bound in `RecursiveCTEExt::with_recursive`
+   | |_____- in this macro invocation
    = note: this error originates in the macro `impl_with_recursive_methods` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -114,6 +114,10 @@ make lint
 make test
 ```
 
+Building the suite requires **Rust 1.94.0 or newer** (pinned in
+`rust-toolchain.toml`). The embedded PostgreSQL worker pulls in
+`postgresql_embedded` and `sqlx`, whose 0.20 and 0.9 releases set that floor.
+
 `make test` spins up an embedded PostgreSQL instance via
 `pg_embedded_setup_unpriv`. The helper automatically provisions binaries,
 configures `$PGPASSFILE`, and reuses one shared cluster while each test
