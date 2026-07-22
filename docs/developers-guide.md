@@ -73,11 +73,11 @@ workflow's feature set; strengthen the relevant tests instead.
 
 `.github/workflows/mutation-testing.yml` is a thin caller of the shared
 reusable workflow `leynos/shared-actions/.github/workflows/mutation-cargo.yml`.
-The heavy lifting — running `cargo-mutants` and summarizing survivors — lives
-in `shared-actions`; this repository carries only declarative configuration.
-The run is informational only: it never gates a pull request, and survivors
-are reported through the job summary and downloadable artefacts for triage
-into tests rather than enforced as a blocking check.
+The heavy lifting — running `cargo-mutants` and summarizing survivors — lives in
+`shared-actions`; this repository carries only declarative configuration. The
+run is informational only: it never gates a pull request, and survivors are
+reported through the job summary and downloadable artefacts for triage into
+tests rather than enforced as a blocking check.
 
 The caller currently sets three inputs:
 
@@ -90,34 +90,34 @@ The caller currently sets three inputs:
 - `setup-commands` — pins `PG_PASSWORD` for the embedded PostgreSQL cluster.
   The `pg-embed-setup-unpriv` library otherwise generates a fresh random
   superuser password per run while cluster state persists between runs, so a
-  second plain `cargo test` in the same job would fail to authenticate; a
-  fixed password keeps every per-mutant run consistent with the baseline run.
+  second plain `cargo test` in the same job would fail to authenticate; a fixed
+  password keeps every per-mutant run consistent with the baseline run.
 
-Every other input keeps the shared workflow's default, including `paths`,
-which this repository does not set.
+Every other input keeps the shared workflow's default, including `paths`, which
+this repository does not set.
 
 `tests/workflow_contracts/mutation_testing_test.py` parses the caller with
 PyYAML and pins the shape it must uphold, failing the pull request when the
-caller drifts rather than letting the breakage surface only in a scheduled
-run. Run it locally with `make test-workflow-contracts` (this wraps `uv run
---with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q`).
+caller drifts rather than letting the breakage surface only in a scheduled run.
+Run it locally with `make test-workflow-contracts` (this wraps
+`uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q`).
 The test validates:
 
-- job permissions are exactly least-privilege (`contents: read`, `id-token:
-  write`), and the workflow-level default token scope is empty;
+- job permissions are exactly least-privilege (`contents: read`,
+  `id-token: write`), and the workflow-level default token scope is empty;
 - `concurrency` serializes runs per ref (`cancel-in-progress: false`);
-- the triggers keep the daily 09:35 UTC schedule and a plain
-  `workflow_dispatch` with no legacy branch input; and
+- the daily 09:35 UTC schedule remains, and `workflow_dispatch` is present
+  without the legacy `branch` input; and
 - the `with:` block carries exactly the three inputs above and no others.
 
-Note what the test deliberately does not assert: it has no check on the
-`uses:` line itself, so it neither pins the reusable workflow's commit SHA nor
-merely shape-checks it as a 40-character hex string. That gap is intentional
-rather than an oversight — as the section above notes, Dependabot manages the
-pinned SHA, and duplicating it in a test constant would require every
-Dependabot bump to edit the test in lockstep. The trade-off is that the
-contract test alone will not catch the pin being repointed at a branch or tag;
-that risk is accepted in exchange for frictionless SHA bumps.
+Note what the test deliberately does not assert: it has no check on the `uses:`
+line itself, so it neither pins the reusable workflow's commit SHA nor merely
+shape-checks it as a 40-character hex string. That gap is intentional rather
+than an oversight — as the section above notes, Dependabot manages the pinned
+SHA, and duplicating it in a test constant would require every Dependabot bump
+to edit the test in lockstep. The trade-off is that the contract test alone
+will not catch the pin being repointed at a branch or tag; that risk is
+accepted in exchange for frictionless SHA bumps.
 
 ## Compile-fail UI tests
 
