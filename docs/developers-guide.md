@@ -108,16 +108,14 @@ The test validates:
 - `concurrency` serializes runs per ref (`cancel-in-progress: false`);
 - the daily 09:35 UTC schedule remains, and `workflow_dispatch` is present
   without the legacy `branch` input; and
+- `uses:` names the shared `mutation-cargo.yml` workflow and ends with a
+  40-character hexadecimal commit SHA; and
 - the `with:` block carries exactly the three inputs above and no others.
 
-Note what the test deliberately does not assert: it has no check on the `uses:`
-line itself, so it neither pins the reusable workflow's commit SHA nor merely
-shape-checks it as a 40-character hex string. That gap is intentional rather
-than an oversight — as the section above notes, Dependabot manages the pinned
-SHA, and duplicating it in a test constant would require every Dependabot bump
-to edit the test in lockstep. The trade-off is that the contract test alone
-will not catch the pin being repointed at a branch or tag; that risk is
-accepted in exchange for frictionless SHA bumps.
+The test validates only the SHA's shape, not its value. Dependabot continues to
+manage the exact pin, so its updates do not require a matching test change; the
+contract merely prevents the reusable workflow from being repointed at a
+branch, tag, or abbreviated revision.
 
 ## Compile-fail UI tests
 

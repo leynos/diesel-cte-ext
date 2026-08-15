@@ -12,7 +12,7 @@ accepted = ["Center"]
 [words.corrections]
 
 [patterns]
-ignore = []
+ignore = ["`[^`\\n]+`"]
 
 [files]
 exclude = []
