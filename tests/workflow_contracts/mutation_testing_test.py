@@ -13,6 +13,7 @@ Run via ``make test-workflow-contracts``.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -36,6 +37,11 @@ EXPECTED_WITH = {
         'echo "PG_PASSWORD=cargo-mutants-embedded-pg" >> "$GITHUB_ENV"\n'
     ),
 }
+
+
+USES_RE = re.compile(
+    r"^leynos/shared-actions/.github/workflows/mutation-cargo\.yml@[0-9A-Fa-f]{40}$"
+)
 
 
 def _load() -> dict[str, object]:
@@ -106,6 +112,16 @@ def test_triggers_keep_schedule_and_plain_dispatch() -> None:
     assert "branch" not in inputs, (
         "on.workflow_dispatch must not declare a branch input; the Actions "
         "run-workflow control selects the ref"
+    )
+
+
+def test_mutation_job_uses_a_pinned_shared_workflow() -> None:
+    """The reusable workflow reference keeps a full commit-SHA pin."""
+    uses = _mutation_job(_load()).get("uses")
+    assert isinstance(uses, str), "jobs.mutation.uses must be a string"
+    assert USES_RE.fullmatch(uses), (
+        "jobs.mutation.uses must reference mutation-cargo.yml at a "
+        f"40-character commit SHA, got {uses!r}"
     )
 
 

@@ -73,6 +73,54 @@ and the tracking issue. The `mutants` dev-dependency exists solely so these
 test-only attributes resolve. Do not skip mutants that can be exercised by the
 workflow's feature set; strengthen the relevant tests instead.
 
+### Workflow contract tests
+
+`.github/workflows/mutation-testing.yml` is a thin caller of the shared
+reusable workflow `leynos/shared-actions/.github/workflows/mutation-cargo.yml`.
+The heavy lifting — running `cargo-mutants` and summarizing survivors — lives in
+`shared-actions`; this repository carries only declarative configuration. The
+run is informational only: it never gates a pull request, and survivors are
+reported through the job summary and downloadable artefacts for triage into
+tests rather than enforced as a blocking check.
+
+The caller currently sets three inputs:
+
+- `exclude-globs: "src/test_support.rs"` — keeps survivors from the unit-test
+  scaffolding module out of the report, since they are noise rather than
+  genuine test gaps.
+- `extra-args: "--all-features"` — mirrors the repository's canonical test
+  baseline (`make test` runs with all features enabled), so feature-gated code
+  is compiled and exercised against mutants.
+- `setup-commands` — pins `PG_PASSWORD` for the embedded PostgreSQL cluster.
+  The `pg-embed-setup-unpriv` library otherwise generates a fresh random
+  superuser password per run while cluster state persists between runs, so a
+  second plain `cargo test` in the same job would fail to authenticate; a fixed
+  password keeps every per-mutant run consistent with the baseline run.
+
+Every other input keeps the shared workflow's default, including `paths`, which
+this repository does not set.
+
+`tests/workflow_contracts/mutation_testing_test.py` parses the caller with
+PyYAML and pins the shape it must uphold, failing the pull request when the
+caller drifts rather than letting the breakage surface only in a scheduled run.
+Run it locally with `make test-workflow-contracts` (this wraps
+`uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q`).
+The test validates:
+
+- job permissions are exactly least-privilege (`contents: read`,
+  `id-token: write`), and the workflow-level default token scope is empty;
+- `concurrency` serializes runs per ref (`cancel-in-progress: false`);
+- the daily 09:35 UTC schedule remains, and `workflow_dispatch` is present
+  without the legacy `branch` input; and
+- `uses:` names the shared `mutation-cargo.yml` workflow and ends with a
+  40-character hexadecimal commit SHA; and
+- the `with:` block carries exactly the three inputs above and no others.
+
+The test validates only the SHA's shape, not its value. Dependabot continues to
+manage the exact pin, so its updates do not require a matching test change; the
+contract merely prevents the reusable workflow from being repointed at a
+branch, tag, or abbreviated revision.
+
 ## Compile-fail UI tests
 
 Compile-time contracts for macros and type-level behaviour are covered by the
