@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/setup-rust@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
       - name: Setup uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
         with:
@@ -61,7 +61,7 @@ jobs:
       - name: Test pg_worker preparation
         run: make test-prepare-pg-worker
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/generate-coverage@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           output-path: lcov.info
           format: lcov
@@ -78,7 +78,7 @@ jobs:
         env:
           CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
         if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@794e4801babcf68065c660fdf4781ad62be5d061
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@2055f0a7aba1a9d439dd7aba1f3559416b0a08ce
         with:
           format: lcov
           mode: check
