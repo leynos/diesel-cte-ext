@@ -100,7 +100,7 @@ diesel = { version = "2", default-features = false, features = [
 ] }
 diesel-async = { version = "0.9", features = ["sqlite", "postgres", "tokio", "async-connection-wrapper"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-rstest = "0.26"
+rstest = "0.27"
 pg-embed-setup-unpriv = { version = "0.5.2", features = ["diesel-support"] }
 proptest = "1"
 trybuild = "1"
