@@ -241,7 +241,13 @@ project:
 
 ## Markdown Guidance
 
-- Validate Markdown files using `make markdownlint`.
+- Validate Markdown files using `make markdownlint`. This target also enforces
+  en-GB-oxendict spelling.
+- Enforce spelling with `make spelling`. It regenerates `typos.toml` from the
+  live shared dictionary and the `typos.local.toml` overlay, then checks the
+  tracked Markdown. Never edit generated entries by hand; add narrow
+  repository-specific entries to `typos.local.toml` instead. Because the
+  dictionary is live, `typos.toml` must not be drift checked in CI.
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.
