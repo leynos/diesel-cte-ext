@@ -11,7 +11,11 @@ accepted = []
 [words.corrections]
 
 [patterns]
-ignore = ["`[^`\\n]+`"]
+ignore = [
+  # Inline code spans were masked by the previous dictionary snapshot; kept
+  # until the shared dictionary rules on it.
+  '`[^`\n]+`',
+"`[^`\\n]+`"]
 
 [files]
 exclude = []
