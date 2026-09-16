@@ -14,24 +14,30 @@ to type-check every target with all features enabled.
 
 ## Spelling policy
 
-Run `make markdownlint` to lint Markdown and enforce en-GB-oxendict spelling.
-The target uses the `TYPOS_VERSION` pin in the `Makefile`, tests the policy
-helper, refreshes the shared base dictionary, generates `typos.toml`, and scans
-tracked Markdown files.
-
-The shared dictionary is maintained in `leynos/agent-helper-scripts`. Its
-repository-local cache and freshness metadata are untracked. The helper
-replaces the cache only when the authoritative copy is newer and can reuse a
-valid cached copy while offline. A clean checkout with an unavailable network
-retains the reviewed, tracked `typos.toml` policy.
-
-Do not edit generated entries in `typos.toml`. Put only repository-specific
-proper nouns, quoted upstream titles, fixtures, stems or exclusions in
-`typos.local.toml`, then regenerate with:
+Run the spelling gate with:
 
 ```bash
-uv run scripts/generate_typos_config.py
+make spelling
 ```
+
+The gate enforces en-GB-oxendict spelling in tracked Markdown prose.
+`make markdownlint` depends on it, so linting Markdown also checks spelling.
+
+The tracked `typos.toml` is regenerated on every run from the live shared
+dictionary and the repository-specific `typos.local.toml` overlay. Because the
+dictionary is live, `typos.toml` must never be drift checked in Continuous
+Integration (CI); a regenerated file differing from the committed copy is
+expected.
+
+Do not edit generated entries in `typos.toml`. Put only narrow
+repository-specific proper nouns, quoted upstream titles, fixtures, stems or
+exclusions in `typos.local.toml`.
+
+The shared dictionary is maintained in `leynos/agent-helper-scripts`. Its
+repository-local cache and freshness metadata are untracked. The gate replaces
+the cache only when the authoritative copy is newer and reuses a valid cached
+copy while offline. The gate also enforces exact phrase corrections that Typos
+cannot match, because it splits hyphenated phrases into separate words.
 
 Keep upstream API spellings in inline or fenced code where practical. The
 spelling gate deliberately ignores code spans and fenced code blocks.

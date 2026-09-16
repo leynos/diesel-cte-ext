@@ -6,8 +6,7 @@ schema = 1
 stems = []
 
 [words]
-# Microsoft product title: "Azure Architecture Center".
-accepted = ["Center"]
+accepted = []
 
 [words.corrections]
 
