@@ -13,5 +13,16 @@
     "MD024": { "siblings_only": true },
     "MD029": { "style": "ordered" }
   },
-  "ignores": ["**/.venv/**", ".node_modules/**", "**/node_modules/**", "**/target/**"]
+  "ignores": [
+    "**/.venv/**",
+    ".node_modules/**",
+    "**/node_modules/**",
+    "**/target/**",
+    ".vtcode/**",
+    ".terraform/**",
+    ".uv-cache/**",
+    "memories/**",
+    "CRUSH.md",
+    "**/dist/**"
+  ]
 }
