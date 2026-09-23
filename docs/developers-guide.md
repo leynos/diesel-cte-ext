@@ -154,7 +154,10 @@ concurrency group is keyed on the ref alone and never cancels a run in
 progress, so runs on `main` never overlap and a newer run replaces any pending
 one; a dispatch that replaces a pending push uploads the same or a newer
 commit, but leaves the ratchet baseline one commit behind until the next push.
-Both are tracked in leynos/shared-actions#518.
+Both are tracked in leynos/shared-actions#518. Triggered runs, pushes and
+dispatches, therefore upload in commit order; a manual re-run of an older run
+is an operator action that republishes that commit's coverage and baseline
+until the next push supersedes it.
 
 No other workflow a push starts, directly or through a local call, may generate
 coverage outside the pull-request guard, so the publisher is the only baseline

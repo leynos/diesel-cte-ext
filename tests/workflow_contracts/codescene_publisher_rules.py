@@ -106,9 +106,12 @@ def expected_concurrency(name: str) -> dict[str, object]:
 
     One group per ref, named after the workflow, never cancelling. Runs in one
     group never overlap, and the survivor of any replacement is the newest
-    trigger, whose commit is the newest main at trigger time, so uploads land
-    in commit order. Keying the group on the event as well would let an earlier
-    dispatch finish after a newer push and upload older coverage last.
+    trigger, whose commit is the newest main at trigger time, so triggered runs
+    (pushes and dispatches) upload in commit order. A manual re-run of an older
+    run is an operator action that republishes that commit's coverage and
+    baseline until the next push supersedes it. Keying the group on the event
+    as well would let an earlier dispatch finish after a newer push and upload
+    older coverage last.
 
     Parameters
     ----------
