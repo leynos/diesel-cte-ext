@@ -111,13 +111,20 @@ def _env_bindings(name: str, document: Document) -> list[str]:
 
 def _outside_steps(name: str, document: Document, check: Step, upload: Step) -> list[str]:
     """Report the token anywhere but the check command and the upload input."""
-    rest = copy.deepcopy(document)
-    for job in jobs(name, rest).values():
-        job["steps"] = [
-            step
-            for step in typ.cast("list[Step]", job.get("steps", []))
-            if step not in (check, upload)
-        ]
+    # Removed by identity, not equality: a copy of the check step elsewhere
+    # compares equal to it and must stay in the sweep.
+    rest = dict(document)
+    rest["jobs"] = {
+        job_name: {
+            **job,
+            "steps": [
+                step
+                for step in typ.cast("list[Step]", job.get("steps", []))
+                if step is not check and step is not upload
+            ],
+        }
+        for job_name, job in jobs(name, document).items()
+    }
     remaining = copy.deepcopy(upload)
     inputs = remaining.get("with")
     if isinstance(inputs, dict):

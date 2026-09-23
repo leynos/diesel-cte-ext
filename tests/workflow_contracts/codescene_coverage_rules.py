@@ -8,6 +8,7 @@ selects, at the same pin; and nothing else may write a baseline.
 
 from __future__ import annotations
 
+import posixpath
 import re
 import typing as typ
 
@@ -165,8 +166,41 @@ def _artefact_uploads(documents: dict[str, Document], report: object) -> list[st
         f"{name} must not upload the coverage report as an artefact"
         for name, document in pull_request_closure(documents).items()
         for step in steps(name, document)
-        if calls(step, ARTEFACT_ACTION) and str(report) in str(_with(step, "path"))
+        if calls(step, ARTEFACT_ACTION)
+        and any(_may_hold(line, str(report)) for line in _upload_paths(step))
     ]
+
+
+def _upload_paths(step: Step) -> list[str]:
+    """Return the included paths of an upload-artifact step, one per line."""
+    return [
+        line.strip()
+        for line in str(_with(step, "path") or "").splitlines()
+        if line.strip() and not line.strip().startswith("!")
+    ]
+
+
+def _may_hold(path: str, report: str) -> bool:
+    """Return whether an upload path could include the coverage report.
+
+    Read as a matcher, not a substring: a glob, an expression, the workspace
+    root or anything above it could hold the report under any name, and a
+    directory holds whatever lies beneath it. Only a literal path that is
+    neither the report nor one of its parent directories is cleared.
+
+    Examples
+    --------
+    >>> [_may_hold(p, "lcov.info") for p in (".", "**/*", "./lcov.info", "dist")]
+    [True, True, True, False]
+
+    """
+    if any(marker in path for marker in ("*", "?", "[", "$", "~")):
+        return True
+    normal = posixpath.normpath(path.replace("\\", "/"))
+    if normal in {".", "/"} or normal.startswith(("..", "/")):
+        return True
+    target = posixpath.normpath(report)
+    return target == normal or target.startswith(f"{normal}/")
 
 
 def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:

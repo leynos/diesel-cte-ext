@@ -21,6 +21,7 @@ from codescene_workflow_reader import (
     folded,
     jobs,
     scalars,
+    steps,
     triggers,
 )
 
@@ -134,10 +135,20 @@ def _chained(found: set[str], documents: dict[str, Document]) -> set[str]:
 
 
 def _watched_workflows(name: str, document: Document) -> set[str]:
-    """Return the workflows one workflow's `workflow_run` trigger watches."""
+    """Return the workflows one workflow's `workflow_run` trigger watches.
+
+    Only a list of names is read. A bare string would split into characters
+    and match nothing, dropping the chained workflow from the closure, so
+    any other shape is refused.
+    """
     run = triggers(name, document).get("workflow_run")
     watched = run.get("workflows", []) if isinstance(run, dict) else []
-    return set(map(str, typ.cast("list[object]", watched)))
+    match watched:
+        case list() if all(isinstance(entry, str) for entry in watched):
+            return set(typ.cast("list[str]", watched))
+        case _:
+            message = f"{name}: cannot read `workflow_run.workflows` {watched!r}"
+            raise WorkflowError(message)
 
 
 def _reached_from(found: set[str], documents: dict[str, Document]) -> set[str]:
@@ -271,6 +282,7 @@ def pull_request_contacts(documents: dict[str, Document]) -> list[str]:
         for problem in (
             *_forbidden_contacts(name, document),
             *_inherited_secrets(name, document),
+            *_local_actions(name, document),
         )
     ]
 
@@ -291,4 +303,17 @@ def _inherited_secrets(name: str, document: Document) -> list[str]:
         f"{name} job {job_name} forwards every secret with `secrets: inherit`"
         for job_name, job in jobs(name, document).items()
         if job.get("secrets") == "inherit"
+    ]
+
+
+def _local_actions(name: str, document: Document) -> list[str]:
+    """Report each step in one workflow that runs a local action.
+
+    A local action's `action.yml` is not read by these rules, so it could
+    reach CodeScene unseen; it is refused rather than followed.
+    """
+    return [
+        f"{name} runs the local action {step['uses']}, which these rules cannot read"
+        for step in steps(name, document)
+        if str(step.get("uses", "")).startswith(("./", "$/"))
     ]

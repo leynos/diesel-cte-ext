@@ -17,6 +17,7 @@ from codescene_contract_support import (
     CREDENTIAL_REFERENCE,
     LANE,
     Documents,
+    assert_clean,
     assert_reports,
     coverage_step,
     find_publisher,
@@ -65,6 +66,18 @@ def test_token_cannot_reach_another_step(documents: Documents) -> None:
     """A later step naming the token in its script is refused."""
     publisher, _ = find_publisher(documents)
     job_steps(publisher).append({"run": f"echo {CREDENTIAL_REFERENCE}"})
+    assert_reports(publisher_violations, documents, "outside its two uses")
+
+
+def test_a_copied_check_step_is_still_swept(documents: Documents) -> None:
+    """A copy of the check step in another job compares equal to the original.
+
+    The sweep removes the approved steps by identity, so the copy still counts
+    as the token outside its two uses.
+    """
+    publisher, _ = find_publisher(documents)
+    other = {"runs-on": "ubuntu-latest", "steps": [dict(_check_step(documents))]}
+    typ.cast("dict[str, object]", publisher["jobs"])["other"] = other
     assert_reports(publisher_violations, documents, "outside its two uses")
 
 
@@ -167,11 +180,55 @@ def test_upload_reads_what_coverage_wrote(
     assert_reports(coverage_violations, documents, expected)
 
 
-def test_pull_request_lane_cannot_upload_the_report(documents: Documents) -> None:
-    """`publish-artefact: 'false'` is moot if another step uploads the report."""
+@pytest.mark.parametrize(
+    "path",
+    [
+        "{report}",
+        "./{report}",
+        ".",
+        "**/*",
+        "${{{{ github.workspace }}}}",
+        "../repo",
+        "dist/\n{report}",
+    ],
+)
+def test_pull_request_lane_cannot_upload_the_report(
+    documents: Documents, path: str
+) -> None:
+    """`publish-artefact: 'false'` is moot if another step uploads the report.
+
+    The path is read as a matcher: the report itself, the workspace root, a
+    glob or an expression could all include it.
+    """
     report = typ.cast("dict[str, object]", coverage_step(documents[LANE])["with"])
     job_steps(documents[LANE]).append({
         "uses": "actions/upload-artifact@v4",
-        "with": {"name": "coverage", "path": report["output-path"]},
+        "with": {"name": "coverage", "path": path.format(report=report["output-path"])},
     })
     assert_reports(coverage_violations, documents, "must not upload the coverage")
+
+
+def test_a_directory_holding_the_report_is_refused(documents: Documents) -> None:
+    """A directory upload includes every file beneath it, the report too."""
+    publisher, upload = find_publisher(documents)
+    report = "target/cov/lcov.info"
+    for step in (coverage_step(documents[LANE]), coverage_step(publisher)):
+        typ.cast("dict[str, object]", step["with"])["output-path"] = report
+    typ.cast("dict[str, object]", upload["with"])["path"] = report
+    job_steps(documents[LANE]).append({
+        "uses": "actions/upload-artifact@v4",
+        "with": {"name": "coverage", "path": "target/cov"},
+    })
+    assert_reports(coverage_violations, documents, "must not upload the coverage")
+
+
+@pytest.mark.parametrize("path", ["dist", "target/nextest/junit.xml\n!**/lcov.info"])
+def test_pull_request_lane_may_upload_other_files(
+    documents: Documents, path: str
+) -> None:
+    """A literal path that is neither the report nor its directory is cleared."""
+    job_steps(documents[LANE]).append({
+        "uses": "actions/upload-artifact@v4",
+        "with": {"name": "other", "path": path},
+    })
+    assert_clean(coverage_violations, documents)

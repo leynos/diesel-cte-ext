@@ -117,19 +117,10 @@ def test_closure_refuses_calls_it_cannot_read(
         pull_request_closure(documents)
 
 
-def test_closure_starts_from_pull_request_target(documents: Documents) -> None:
-    """A pull_request_target workflow runs with secrets on every PR event."""
-    documents[PROBE] = load_workflow(
-        PROBE,
-        "on: pull_request_target\njobs:\n  a:\n    steps:\n"
-        "      - run: curl https://codescene.io\n",
-    )
-    _assert_contact(documents, f"{PROBE} names the CodeScene host")
-
-
 @pytest.mark.parametrize(
     "event",
     [
+        "pull_request_target",
         "issue_comment",
         "merge_group",
         "pull_request_review",
@@ -141,7 +132,12 @@ def test_closure_starts_from_pull_request_target(documents: Documents) -> None:
 def test_closure_starts_from_every_pull_request_event(
     documents: Documents, event: str
 ) -> None:
-    """A queued merge or a review runs with secrets for a same-repository PR."""
+    """Every event that runs with secrets for a pull request seeds the closure.
+
+    `pull_request_target` runs with secrets on every pull request; a queued
+    merge, a review, a comment, or a push not confined to main runs with them
+    for a same-repository pull request.
+    """
     documents[PROBE] = load_workflow(
         PROBE,
         f"on: {event}\njobs:\n  a:\n    steps:\n"
@@ -169,6 +165,31 @@ def test_trunk_tag_and_schedule_triggers_stay_off_the_surface(
     )
     closure = pull_request_closure(documents)
     assert PROBE not in closure, f"{trigger} reached the pull-request surface"
+
+
+@pytest.mark.parametrize("watched", ["CI", "{name: CI}", "[CI, 1]"])
+def test_closure_refuses_an_unreadable_workflow_run_list(
+    documents: Documents, watched: str
+) -> None:
+    """A bare string would split into characters and match nothing."""
+    documents[PROBE] = load_workflow(
+        PROBE, f"on:\n  workflow_run:\n    workflows: {watched}\njobs: {{}}\n"
+    )
+    with pytest.raises(WorkflowError, match="cannot read `workflow_run.workflows`"):
+        pull_request_closure(documents)
+
+
+@pytest.mark.parametrize(
+    "uses", ["./.github/actions/probe", "$/.github/actions/probe"]
+)
+def test_pull_request_lane_cannot_run_a_local_action(
+    documents: Documents, uses: str
+) -> None:
+    """A local action's own file is not read, so it is refused, not followed."""
+    job_steps(documents[LANE]).append({"uses": uses})
+    _assert_contact(
+        documents, f"{LANE} runs the local action {uses}, which these rules cannot read"
+    )
 
 
 def test_callee_secret_declaration_is_refused(documents: Documents) -> None:
