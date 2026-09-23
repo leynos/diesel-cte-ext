@@ -126,13 +126,24 @@ def _chained(found: set[str], documents: dict[str, Document]) -> set[str]:
     watched_names = {
         str(documents[name].get("name", f"{WORKFLOW_PREFIX}{name}")) for name in found
     }
-    chained: set[str] = set()
-    for name, document in documents.items():
-        run = triggers(name, document).get("workflow_run")
-        watched = run.get("workflows", []) if isinstance(run, dict) else []
-        if watched_names.intersection(map(str, typ.cast("list[object]", watched))):
-            chained.add(name)
-    return chained
+    return {
+        name
+        for name, document in documents.items()
+        if watched_names & _watched_workflows(name, document)
+    }
+
+
+def _watched_workflows(name: str, document: Document) -> set[str]:
+    """Return the workflows one workflow's `workflow_run` trigger watches."""
+    run = triggers(name, document).get("workflow_run")
+    watched = run.get("workflows", []) if isinstance(run, dict) else []
+    return set(map(str, typ.cast("list[object]", watched)))
+
+
+def _reached_from(found: set[str], documents: dict[str, Document]) -> set[str]:
+    """Return the found workflows and everything one call or chain away."""
+    grown = found | _chained(found, documents)
+    return grown | {callee for name in grown for callee in _callees(name, documents)}
 
 
 def closure(seeds: set[str], documents: dict[str, Document]) -> dict[str, Document]:
@@ -161,12 +172,9 @@ def closure(seeds: set[str], documents: dict[str, Document]) -> dict[str, Docume
 
     """
     found = set(seeds)
-    while True:
-        grown = found | _chained(found, documents)
-        grown |= {callee for name in grown for callee in _callees(name, documents)}
-        if grown == found:
-            return {name: documents[name] for name in sorted(found)}
+    while (grown := _reached_from(found, documents)) != found:
         found = grown
+    return {name: documents[name] for name in sorted(found)}
 
 
 def _push_is_trunk_or_tags(push: object) -> bool:
@@ -257,17 +265,30 @@ def pull_request_contacts(documents: dict[str, Document]) -> list[str]:
         One message per violation; empty when the repository complies.
 
     """
-    found: list[str] = []
-    for name, document in pull_request_closure(documents).items():
-        texts = {folded(text) for text in scalars(document)}
-        found += [
-            f"{name} {reason}"
-            for marker, reason in PULL_REQUEST_FORBIDDEN
-            if any(marker in text for text in texts)
-        ]
-        found += [
-            f"{name} job {job_name} forwards every secret with `secrets: inherit`"
-            for job_name, job in jobs(name, document).items()
-            if job.get("secrets") == "inherit"
-        ]
-    return found
+    return [
+        problem
+        for name, document in pull_request_closure(documents).items()
+        for problem in (
+            *_forbidden_contacts(name, document),
+            *_inherited_secrets(name, document),
+        )
+    ]
+
+
+def _forbidden_contacts(name: str, document: Document) -> list[str]:
+    """Report each forbidden marker found in any scalar of one workflow."""
+    texts = {folded(text) for text in scalars(document)}
+    return [
+        f"{name} {reason}"
+        for marker, reason in PULL_REQUEST_FORBIDDEN
+        if any(marker in text for text in texts)
+    ]
+
+
+def _inherited_secrets(name: str, document: Document) -> list[str]:
+    """Report each job in one workflow that forwards every secret."""
+    return [
+        f"{name} job {job_name} forwards every secret with `secrets: inherit`"
+        for job_name, job in jobs(name, document).items()
+        if job.get("secrets") == "inherit"
+    ]
