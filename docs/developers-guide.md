@@ -127,6 +127,55 @@ manage the exact pin, so its updates do not require a matching test change; the
 contract merely prevents the reusable workflow from being repointed at a
 branch, tag, or abbreviated revision.
 
+## Coverage publication
+
+Pull-request continuous integration (CI) generates LCOV coverage and ratchets
+it against the baseline written by `coverage-main.yml`. The pull-request lane
+publishes no coverage artefact, never contacts CodeScene, and never receives
+`CS_ACCESS_TOKEN`, so a change in CodeScene's application programming interface
+(API) cannot hold a pull request.
+
+`coverage-main.yml` is the only publisher. On each push to `main` it refreshes
+the ratchet baseline and uploads the report to CodeScene. It also runs on
+demand through `workflow_dispatch`, for merges that fire no push event: a
+dispatch on `main` uploads a fresh report, but the shared action advances the
+baseline only on a push, so the ratchet catches up at the next push to `main`.
+No `env` binds `CS_ACCESS_TOKEN`: a check step writes whether the secret is
+set, from an expression evaluated before its shell runs, and the upload step
+receives the token only as its `access-token` input, because the uploader is a
+composite action that would pass its step's `env` to its nested steps. The
+upload runs only when the token is present and the ref is `refs/heads/main`, so
+a dispatch from a branch cannot publish that branch's coverage as the trunk's.
+
+Two gaps are known and accepted. Merges made by the Dependabot automerge
+workflow use `GITHUB_TOKEN` and fire no push event, so they are measured only
+at the next push to `main` or a manual dispatch. And the publisher's
+concurrency group is keyed on the ref alone and never cancels a run in
+progress, so runs on `main` never overlap and a newer run replaces any pending
+one; a dispatch that replaces a pending push uploads the same or a newer
+commit, but leaves the ratchet baseline one commit behind until the next push.
+Both are tracked in leynos/shared-actions#518.
+
+No other workflow a push starts, directly or through a local call, may generate
+coverage outside the pull-request guard, so the publisher is the only baseline
+writer. Both coverage steps select the same inputs at the same `shared-actions`
+pin because the pull-request ratchet is only meaningful against a baseline
+measured the same way.
+
+`make test-workflow-contracts` holds this shape. The contract tests are
+`codescene_pull_request_test.py`, `codescene_publisher_test.py` and
+`codescene_token_test.py` under `tests/workflow_contracts/`, with the rules in
+the `codescene_*_rules.py` modules beside them and the strict workflow reader in
+`codescene_workflow_reader.py`. The rules read every workflow a pull request
+can start, from its own events, reviews and comments, a merge queue, or a push
+not confined to `main` or tags, following local reusable-workflow calls and
+`workflow_run` chains, and refuse any mention of the CodeScene host, uploader,
+client, or token there. They also refuse `continue-on-error` wherever it would
+turn a failed ratchet or upload green. The upload guard is compared as an exact
+set of conjuncts, so an `||` hidden inside an extra conjunct fails the
+comparison without a separate scan. Each clause has a test that mutates the
+workflows and expects the clause to refuse the result.
+
 ## Compile-fail UI tests
 
 Compile-time contracts for macros and type-level behaviour are covered by the

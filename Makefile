@@ -70,7 +70,7 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
 	bash tests/prepare_pg_worker_makefile.sh
 
-test-workflow-contracts: ## Validate the mutation-testing caller contract
+test-workflow-contracts: ## Validate the mutation-testing and CodeScene coverage workflow contracts
 	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
