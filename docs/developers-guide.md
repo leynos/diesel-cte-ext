@@ -150,9 +150,11 @@ a dispatch from a branch cannot publish that branch's coverage as the trunk's.
 Two gaps are known and accepted. Merges made by the Dependabot automerge
 workflow use `GITHUB_TOKEN` and fire no push event, so they are measured only
 at the next push to `main` or a manual dispatch. A dispatch that replaces a
-pending push uploads the same or a newer commit, but leaves the ratchet
-baseline one commit behind until the next push. Both are tracked in
-leynos/shared-actions#518.
+pending push writes no baseline, since the shared action saves one only on a
+push, so the ratchet baseline stays behind until the next push. Both are
+tracked in leynos/shared-actions#518. A dispatch made before a push can also
+reach the concurrency group after it, replace it and upload the older commit;
+that is part of the stale-order risk accepted below.
 
 The publisher's concurrency group is keyed on the ref alone and never cancels a
 run in progress, so runs on `main` never overlap, and a newer trigger replaces
