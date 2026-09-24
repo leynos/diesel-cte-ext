@@ -100,7 +100,7 @@ def test_publisher_never_cancels(documents: Documents, concurrency: object) -> N
     ],
 )
 def test_publisher_group_is_exactly_the_ref(documents: Documents, group: str) -> None:
-    """One group per ref keeps uploads in commit order."""
+    """One group per ref keeps runs on main from overlapping."""
     publisher, _ = find_publisher(documents)
     publisher["concurrency"] = {"group": group, "cancel-in-progress": False}
     assert_reports(publisher_violations, documents, "concurrency must be exactly")

@@ -105,13 +105,10 @@ def expected_concurrency(name: str) -> dict[str, object]:
     """Return the one concurrency block a publisher may declare.
 
     One group per ref, named after the workflow, never cancelling. Runs in one
-    group never overlap, and the survivor of any replacement is the newest
-    trigger, whose commit is the newest main at trigger time, so triggered runs
-    (pushes and dispatches) upload in commit order. A manual re-run of an older
-    run is an operator action that republishes that commit's coverage and
-    baseline until the next push supersedes it. Keying the group on the event
-    as well would let an earlier dispatch finish after a newer push and upload
-    older coverage last.
+    group never overlap, and a newer trigger replaces an older pending run
+    rather than queueing behind it. GitHub does not promise to start runs in
+    trigger order, so this does not guarantee commit order. Keying the group on
+    the event as well would let a dispatch and a push to main run at once.
 
     Parameters
     ----------

@@ -23,12 +23,12 @@ on:
 
 # One group per ref, never cancelled. A cancelled run abandons both its upload
 # and its baseline write. Runs in one group never overlap, and a newer trigger
-# replaces any run still pending, so among triggered runs (pushes and
-# dispatches) uploads land in commit order and the newest baseline wins. A
-# manual re-run of an older run is an operator action: it republishes that
-# commit's coverage and baseline until the next push supersedes it. The group
-# is not keyed on the event: that would let an earlier dispatch finish after a
-# newer push and upload older coverage last.
+# replaces an older pending run rather than queueing behind it. GitHub does not
+# promise to start runs in trigger order, so this does not guarantee commit
+# order. A manual re-run of an older run keeps its SHA and its run id: it
+# republishes that commit's coverage to CodeScene, but replaces no ratchet
+# baseline unless the original run saved none. The group is not keyed on the
+# event, which would let a dispatch and a push to main run at once.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false
