@@ -11,6 +11,7 @@ from __future__ import annotations
 import posixpath
 import re
 import typing as typ
+from pathlib import PurePosixPath
 
 from codescene_publisher_rules import READ_ONLY, upload_steps
 from codescene_pull_request_rules import closure, pull_request_closure
@@ -196,11 +197,11 @@ def _may_hold(path: str, report: str) -> bool:
     """
     if any(marker in path for marker in ("*", "?", "[", "$", "~")):
         return True
-    normal = posixpath.normpath(path.replace("\\", "/"))
-    if normal in {".", "/"} or normal.startswith(("..", "/")):
+    literal = PurePosixPath(posixpath.normpath(path.replace("\\", "/")))
+    if literal.is_absolute() or literal.parts[:1] in {(), ("..",)}:
         return True
-    target = posixpath.normpath(report)
-    return target == normal or target.startswith(f"{normal}/")
+    target = PurePosixPath(posixpath.normpath(report))
+    return literal == target or literal in target.parents
 
 
 def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:

@@ -27,8 +27,11 @@ on:
 # promise to start runs in trigger order, so this does not guarantee commit
 # order. A manual re-run of an older run keeps its SHA and its run id: it
 # republishes that commit's coverage to CodeScene, but replaces no ratchet
-# baseline unless the original run saved none. The group is not keyed on the
-# event, which would let a dispatch and a push to main run at once.
+# baseline while the original run's cache entry survives. If that entry is
+# gone, never saved or since evicted, the re-run saves the older commit's
+# baseline as the newest entry, and later ratchets read it until the next push
+# saves a newer one: an accepted stale-order risk. The group is not keyed on
+# the event, which would let a dispatch and a push to main run at once.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false

@@ -161,8 +161,12 @@ start runs in trigger order, so this does not guarantee commit order: an older
 run that starts late can publish its commit's coverage after a newer one, and
 the next push supersedes it. A manual re-run of an older run keeps its SHA and
 its run id: it republishes that commit's coverage to CodeScene, but replaces no
-ratchet baseline unless the original run saved none, because the shared action
-saves each baseline under a key that includes the run id.
+ratchet baseline while the original run's cache entry survives, because the
+shared action saves each baseline under a key that includes the run id. If that
+entry is gone, never saved or since evicted, the re-run saves the older
+commit's baseline again, the shared action restores the newest entry under the
+key prefix, and later ratchets read the older baseline until the next push
+saves a newer one. That stale-order risk is accepted.
 
 No other workflow a push starts, directly or through a local call, may generate
 coverage outside the pull-request guard, so the publisher is the only baseline

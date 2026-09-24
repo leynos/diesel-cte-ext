@@ -189,6 +189,7 @@ def test_upload_reads_what_coverage_wrote(
         "**/*",
         "${{{{ github.workspace }}}}",
         "../repo",
+        "/home/runner/work",
         "dist/\n{report}",
     ],
 )
