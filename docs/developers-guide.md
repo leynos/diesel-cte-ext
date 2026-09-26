@@ -147,15 +147,6 @@ composite action that would pass its step's `env` to its nested steps. The
 upload runs only when the token is present and the ref is `refs/heads/main`, so
 a dispatch from a branch cannot publish that branch's coverage as the trunk's.
 
-Two gaps are known and accepted. Merges made by the Dependabot automerge
-workflow use `GITHUB_TOKEN` and fire no push event, so they are measured only
-at the next push to `main` or a manual dispatch. A dispatch that replaces a
-pending push writes no baseline, since the shared action saves one only on a
-push, so the ratchet baseline stays behind until the next push. Both are
-tracked in leynos/shared-actions#518. A dispatch made before a push can also
-reach the concurrency group after it, replace it and upload the older commit;
-that is part of the stale-order risk accepted below.
-
 The publisher's concurrency group is keyed on the ref alone and never cancels a
 run in progress, so runs on `main` never overlap, and a newer trigger replaces
 an older pending run rather than queueing behind it. GitHub does not promise to
@@ -170,22 +161,39 @@ commit's baseline again, the shared action restores the newest entry under the
 key prefix, and later ratchets read the older baseline until the next push
 saves a newer one. That stale-order risk is accepted.
 
+Two gaps are known and accepted, and both are tracked in
+[shared-actions issue 518](https://github.com/leynos/shared-actions/issues/518):
+
+- Merges made by the Dependabot automerge workflow use `GITHUB_TOKEN` and fire
+  no push event, so they are measured only at the next push to `main` or a
+  manual dispatch.
+- A dispatch that replaces a pending push writes no baseline, since the shared
+  action saves one only on a push, so the ratchet baseline stays behind until
+  the next push. A dispatch made before a push can also reach the concurrency
+  group after it, replace it and upload the older commit; that is part of the
+  stale-order risk accepted above.
+
 No other workflow a push starts, directly or through a local call, may generate
-coverage outside the pull-request guard, so the publisher is the only baseline
-writer. Both coverage steps select the same inputs at the same `shared-actions`
-pin because the pull-request ratchet is only meaningful against a baseline
-measured the same way.
+coverage outside the pull-request guard, and none, the publisher included, may
+run a local action, whose `action.yml` the contract does not read, so the
+publisher is the only baseline writer. Both coverage steps select the same
+inputs at the same `shared-actions` pin because the pull-request ratchet is
+only meaningful against a baseline measured the same way.
 
 `make test-workflow-contracts` holds this shape. The contract tests are
 `codescene_pull_request_test.py`, `codescene_publisher_test.py` and
 `codescene_token_test.py` under `tests/workflow_contracts/`, with the rules in
-the `codescene_*_rules.py` modules beside them and the strict workflow reader in
-`codescene_workflow_reader.py`. The rules read every workflow a pull request
-can start, from its own events, reviews and comments, a merge queue, or a push
-not confined to `main` or tags, following local reusable-workflow calls and
-`workflow_run` chains, and refuse any mention of the CodeScene host, uploader,
-client, or token there. They also refuse `continue-on-error` wherever it would
-turn a failed ratchet or upload green. The upload guard is compared as an exact
+the `codescene_*_rules.py` modules beside them, the strict workflow reader in
+`codescene_workflow_reader.py`, and the scalar flattening the marker rules
+share in `codescene_workflow_text.py`. The rules read every workflow a pull
+request can start, from its own events, reviews and comments, a merge queue, or
+a push not confined to `main` or tags, following local reusable-workflow calls
+and `workflow_run` chains, and refuse any mention of the CodeScene host,
+uploader, client, or token there, and any local action or action named as this
+repository at a ref, whose `action.yml` they do not read. They also refuse
+`continue-on-error` wherever it would turn a failed ratchet or upload green,
+and any `if:` on the job holding the pull-request coverage step, whose own
+guard already selects pull requests. The upload guard is compared as an exact
 set of conjuncts, so an `||` hidden inside an extra conjunct fails the
 comparison without a separate scan. Each clause has a test that mutates the
 workflows and expects the clause to refuse the result.

@@ -23,11 +23,10 @@ from codescene_workflow_reader import (
     Document,
     Step,
     continues_on_error,
-    folded,
     holding_job,
     jobs,
-    scalars,
 )
+from codescene_workflow_text import folded, scalars
 
 #: The check step's id, which the upload guard reads.
 CHECK_ID: typ.Final[str] = "codescene-token"
@@ -150,6 +149,13 @@ def token_violations(name: str, document: Document, upload: Step) -> list[str]:
     -------
     list of str
         One message per violation; empty when the token is used as required.
+
+    Examples
+    --------
+    >>> from codescene_contract_support import fresh_documents, find_publisher
+    >>> publisher, upload = find_publisher(fresh_documents())
+    >>> token_violations("coverage-main.yml", publisher, upload)
+    []
 
     """
     held = typ.cast("list[Step]", holding_job(name, document, upload).get("steps", []))
