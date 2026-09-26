@@ -18,12 +18,11 @@ import typing as typ
 from codescene_workflow_reader import (
     Document,
     WorkflowError,
-    folded,
     jobs,
-    scalars,
     steps,
     triggers,
 )
+from codescene_workflow_text import folded, scalars
 
 #: This repository, for refusing a qualified call to one of its own workflows.
 REPOSITORY: typ.Final[str] = "leynos/diesel-cte-ext"
@@ -44,14 +43,15 @@ PULL_REQUEST_EVENTS: typ.Final[frozenset[str]] = frozenset({
 #: What no pull-request-reachable scalar may contain, case-folded and with
 #: whitespace removed. The token's name catches an `env` key, a reference in a
 #: script, an input or an env value under any key, a named `secrets:`
-#: forwarding and a `workflow_call` secret declaration alike; indexed and
-#: serialized `secrets` reach it without spelling the name.
+#: forwarding and a `workflow_call` secret declaration alike; indexed,
+#: filtered and serialized `secrets` reach it without spelling the name.
 PULL_REQUEST_FORBIDDEN: typ.Final[tuple[tuple[str, str], ...]] = (
     ("codescene.io", "names the CodeScene host"),
     ("upload-codescene-coverage", "calls the CodeScene uploader"),
     ("cs-coverage", "names the cs-coverage client"),
     ("cs_access_token", "puts CS_ACCESS_TOKEN in reach"),
     ("secrets[", "indexes the secrets context"),
+    ("secrets.*", "filters the secrets context"),
     ("tojson(secrets", "serializes the secrets context"),
 )
 
@@ -96,6 +96,14 @@ def local_callee(reference: str, documents: dict[str, Document]) -> str | None:
     WorkflowError
         If the call is a qualified self-call, a `$/` call with a ref, or names
         a local workflow that does not exist.
+
+    Examples
+    --------
+    >>> documents = {"lint.yml": {}}
+    >>> local_callee("./.github/workflows/lint.yml", documents)
+    'lint.yml'
+    >>> local_callee("other/repo/.github/workflows/lint.yml@v1", documents) is None
+    True
 
     """
     _refuse_a_call_at_a_ref(reference)
@@ -181,6 +189,18 @@ def closure(seeds: set[str], documents: dict[str, Document]) -> dict[str, Docume
     WorkflowError
         If a local call cannot be followed; see `local_callee`.
 
+    Examples
+    --------
+    >>> documents = {
+    ...     "ci.yml": {
+    ...         True: "pull_request",
+    ...         "jobs": {"call": {"uses": "./.github/workflows/lint.yml"}},
+    ...     },
+    ...     "lint.yml": {True: {"workflow_call": None}, "jobs": {}},
+    ... }
+    >>> list(closure({"ci.yml"}, documents))
+    ['ci.yml', 'lint.yml']
+
     """
     found = set(seeds)
     while (grown := _reached_from(found, documents)) != found:
@@ -216,6 +236,13 @@ def serves_pull_requests(name: str, document: Document) -> bool:
     bool
         True for a pull-request event, or a push not confined to main or tags.
 
+    Examples
+    --------
+    >>> serves_pull_requests("ci.yml", {True: {"push": {"branches": ["main"]}}})
+    False
+    >>> serves_pull_requests("ci.yml", {True: "pull_request"})
+    True
+
     """
     events = triggers(name, document)
     if PULL_REQUEST_EVENTS & events.keys():
@@ -244,6 +271,15 @@ def pull_request_closure(documents: dict[str, Document]) -> dict[str, Document]:
     WorkflowError
         If no workflow answers a pull-request event, which means the reader is
         broken rather than the repository compliant.
+
+    Examples
+    --------
+    >>> documents = {
+    ...     "ci.yml": {True: "pull_request", "jobs": {}},
+    ...     "release.yml": {True: {"push": {"tags": ["v*"]}}, "jobs": {}},
+    ... }
+    >>> list(pull_request_closure(documents))
+    ['ci.yml']
 
     """
     seeds = {
@@ -274,6 +310,13 @@ def pull_request_contacts(documents: dict[str, Document]) -> list[str]:
     -------
     list of str
         One message per violation; empty when the repository complies.
+
+    Examples
+    --------
+    >>> step = {"run": "curl https://api.codescene.io"}
+    >>> document = {True: "pull_request", "jobs": {"t": {"steps": [step]}}}
+    >>> pull_request_contacts({"ci.yml": document})
+    ['ci.yml names the CodeScene host']
 
     """
     return [
@@ -307,13 +350,24 @@ def _inherited_secrets(name: str, document: Document) -> list[str]:
 
 
 def _local_actions(name: str, document: Document) -> list[str]:
-    """Report each step in one workflow that runs a local action.
+    """Report each step in one workflow that runs this repository's action.
 
     A local action's `action.yml` is not read by these rules, so it could
-    reach CodeScene unseen; it is refused rather than followed.
+    reach CodeScene unseen; it is refused rather than followed. An action
+    named as this repository at a ref is refused alike, since it runs that
+    file from whichever branch the ref names.
     """
     return [
         f"{name} runs the local action {step['uses']}, which these rules cannot read"
         for step in steps(name, document)
-        if str(step.get("uses", "")).startswith(("./", "$/"))
+        if _is_own_action(str(step.get("uses", "")))
     ]
+
+
+def _is_own_action(uses: str) -> bool:
+    """Return whether a step's `uses:` runs an action from this repository."""
+    folded_uses = uses.casefold()
+    own = REPOSITORY.casefold()
+    return uses.startswith(("./", "$/")) or folded_uses.startswith(
+        (f"{own}/", f"{own}@")
+    )

@@ -223,6 +223,24 @@ def test_pull_request_coverage_cannot_be_switched_off(
     assert_reports(coverage_violations, documents, "may run only as")
 
 
+@pytest.mark.parametrize(
+    "guard", ["false", "github.event_name == 'workflow_dispatch'", "always()"]
+)
+def test_pull_request_coverage_job_cannot_be_guarded(
+    documents: Documents, guard: str
+) -> None:
+    """A job guard can switch the lane off while its step keeps its own guard."""
+    first_job(documents[LANE])["if"] = guard
+    assert_reports(coverage_violations, documents, "job must run unconditionally")
+
+
+def test_pull_request_coverage_pin_follows_the_publisher(documents: Documents) -> None:
+    """A lane at another pin ratchets against a baseline measured differently."""
+    step = coverage_step(documents[LANE])
+    step["uses"] = str(step["uses"]).partition("@")[0] + "@" + "0" * 40
+    assert_reports(coverage_violations, documents, "pin differs from the publisher's")
+
+
 def test_repository_selection_is_pinned(documents: Documents) -> None:
     """Both lanes changing their selection together would pass parity alone."""
     publisher, _ = find_publisher(documents)
@@ -291,6 +309,43 @@ def test_push_callee_cannot_write_a_second_baseline(documents: Documents) -> Non
         coverage_violations,
         documents,
         "cov.yml coverage can run on a push; guard it to pull requests",
+    )
+
+
+def test_publisher_callee_cannot_write_a_second_baseline(documents: Documents) -> None:
+    """The publisher's own local callee runs on its push, so its coverage counts."""
+    publisher, _ = find_publisher(documents)
+    step = copy.deepcopy(coverage_step(publisher))
+    documents["cov.yml"] = {
+        True: {"workflow_call": None},
+        "jobs": {"c": {"steps": [step]}},
+    }
+    typ.cast("dict[str, object]", publisher["jobs"])["call"] = {
+        "uses": "./.github/workflows/cov.yml"
+    }
+    assert_reports(
+        coverage_violations,
+        documents,
+        "cov.yml coverage can run on a push; guard it to pull requests",
+    )
+
+
+@pytest.mark.parametrize("uses", ["./.github/actions/cov", "$/.github/actions/cov"])
+@pytest.mark.parametrize("caller", ["publisher", "push callee"])
+def test_push_cannot_run_a_local_action(
+    documents: Documents, uses: str, caller: str
+) -> None:
+    """A local action's `action.yml` is unread, so on a push it could write a baseline."""
+    publisher, _ = find_publisher(documents)
+    documents["cov.yml"] = {True: {"workflow_call": None}, "jobs": {"c": {"steps": []}}}
+    typ.cast("dict[str, object]", publisher["jobs"])["call"] = {
+        "uses": "./.github/workflows/cov.yml"
+    }
+    job_steps(publisher if caller == "publisher" else documents["cov.yml"]).append(
+        {"uses": uses}
+    )
+    assert_reports(
+        coverage_violations, documents, f"runs the local action {uses} on a push"
     )
 
 
