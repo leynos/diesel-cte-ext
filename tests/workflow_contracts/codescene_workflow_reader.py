@@ -12,7 +12,6 @@ is satisfied by any repository at all. Those faults raise `WorkflowError`.
 
 from __future__ import annotations
 
-import re
 import typing as typ
 
 import yaml
@@ -117,6 +116,13 @@ def read_workflows(directory: Path) -> dict[str, Document]:
         If the directory cannot be listed or holds no workflow, or any
         workflow cannot be read as UTF-8 or fails to parse.
 
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> directory = Path(__file__).resolve().parents[2] / ".github" / "workflows"
+    >>> "ci.yml" in read_workflows(directory)
+    True
+
     """
     try:
         paths = sorted(
@@ -168,6 +174,11 @@ def triggers(name: str, document: Document) -> dict[str, object]:
         If `on` is declared under neither or both spellings, or has a shape
         other than a scalar, a sequence of names or a mapping.
 
+    Examples
+    --------
+    >>> triggers("ci.yml", {True: ["push", "pull_request"]})
+    {'push': None, 'pull_request': None}
+
     """
     spellings = [key for key in ("on", True) if key in document]
     if len(spellings) != 1:
@@ -205,6 +216,11 @@ def jobs(name: str, document: Document) -> dict[str, dict[str, object]]:
     WorkflowError
         If `jobs` is missing or does not map job ids to mappings.
 
+    Examples
+    --------
+    >>> jobs("ci.yml", {"jobs": {"test": {"runs-on": "ubuntu-latest"}}})
+    {'test': {'runs-on': 'ubuntu-latest'}}
+
     """
     found = document.get("jobs")
     if not isinstance(found, dict) or not all(
@@ -235,6 +251,14 @@ def steps(name: str, document: Document) -> cabc.Iterator[Step]:
     WorkflowError
         If the jobs are malformed or a step is not a mapping.
 
+    Examples
+    --------
+    >>> document = {
+    ...     "jobs": {"a": {"steps": [{"run": "a"}]}, "b": {"steps": [{"run": "b"}]}}
+    ... }
+    >>> list(steps("ci.yml", document))
+    [{'run': 'a'}, {'run': 'b'}]
+
     """
     for job in jobs(name, document).values():
         for step in typ.cast("list[object]", job.get("steps", [])):
@@ -259,58 +283,14 @@ def calls(step: Step, action: str) -> bool:
     bool
         True when the step's `uses:` names the action, compared without case.
 
+    Examples
+    --------
+    >>> calls({"uses": "Actions/Checkout@v4"}, "actions/checkout")
+    True
+
     """
     uses = str(step.get("uses", ""))
     return uses.partition("@")[0].casefold() == action.casefold()
-
-
-def scalars(value: object) -> cabc.Iterator[str]:
-    """Yield every key and value in a parsed document as text.
-
-    Keys are yielded as well as values: an `env` key or a `workflow_call`
-    secret declaration names the token with no value that refers to it.
-
-    Parameters
-    ----------
-    value : object
-        A parsed document or any part of one.
-
-    Yields
-    ------
-    str
-        Each key and each non-null leaf value, as text.
-
-    """
-    match value:
-        case dict():
-            for key, child in value.items():
-                yield str(key)
-                yield from scalars(child)
-        case list():
-            for child in value:
-                yield from scalars(child)
-        case None:
-            return
-        case _:
-            yield str(value)
-
-
-def folded(text: str) -> str:
-    """Return text case-folded with all whitespace removed.
-
-    Parameters
-    ----------
-    text : str
-        The text to normalize.
-
-    Returns
-    -------
-    str
-        The text, so that `toJSON( secrets )` and `API.CODESCENE.IO` match
-        their plain spellings.
-
-    """
-    return re.sub(r"\s+", "", text).casefold()
 
 
 def continues_on_error(mapping: dict[str, object]) -> bool:
@@ -318,12 +298,58 @@ def continues_on_error(mapping: dict[str, object]) -> bool:
 
     `continue-on-error` keeps the step running while its failure turns green,
     which silences a ratchet or an upload as surely as `if: false` does.
+
+    Parameters
+    ----------
+    mapping : dict of str to object
+        A step or job mapping.
+
+    Returns
+    -------
+    bool
+        True unless `continue-on-error` is absent or exactly `false`; an
+        expression counts as true, since it may evaluate so.
+
+    Examples
+    --------
+    >>> [continues_on_error(m) for m in ({}, {"continue-on-error": "${{ x }}"})]
+    [False, True]
+
     """
     return mapping.get("continue-on-error", False) is not False
 
 
 def holding_job(name: str, document: Document, step: Step) -> dict[str, object]:
-    """Return the job in one workflow whose steps include this step."""
+    """Return the job in one workflow whose steps include this step.
+
+    The step is matched by identity, so a copy in another job is not found.
+
+    Parameters
+    ----------
+    name : str
+        The workflow's file name, for messages.
+    document : Document
+        The parsed workflow.
+    step : Step
+        A step mapping taken from this document.
+
+    Returns
+    -------
+    dict of str to object
+        The job holding the step.
+
+    Raises
+    ------
+    StopIteration
+        If no job in the document holds this very step.
+
+    Examples
+    --------
+    >>> step = {"run": "true"}
+    >>> holding_job("ci.yml", {"jobs": {"a": {"steps": [step]}}}, step)
+    {'steps': [{'run': 'true'}]}
+
+    """
     return next(
         job
         for job in jobs(name, document).values()

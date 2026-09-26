@@ -17,13 +17,12 @@ from codescene_workflow_reader import (
     Step,
     calls,
     continues_on_error,
-    folded,
     holding_job,
     jobs,
-    scalars,
     steps,
     triggers,
 )
+from codescene_workflow_text import folded, scalars
 
 UPLOAD_ACTION: typ.Final[str] = (
     "leynos/shared-actions/.github/actions/upload-codescene-coverage"
@@ -74,6 +73,14 @@ def upload_steps(documents: dict[str, Document]) -> list[tuple[str, Step]]:
     -------
     list of tuple of (str, Step)
         Each uploading step with its workflow's file name.
+
+    Examples
+    --------
+    >>> step = {"uses": f"{UPLOAD_ACTION}@v1"}
+    >>> [(name, found is step) for name, found in upload_steps(
+    ...     {"main.yml": {"jobs": {"u": {"steps": [step]}}}}
+    ... )]
+    [('main.yml', True)]
 
     """
     return [
@@ -219,6 +226,12 @@ def publisher_violations(documents: dict[str, Document]) -> list[str]:
     list of str
         One message per violation; empty when the repository complies.
 
+    Examples
+    --------
+    >>> from codescene_contract_support import fresh_documents
+    >>> publisher_violations(fresh_documents())
+    []
+
     """
     uploads = upload_steps(documents)
     if len(uploads) != 1:
@@ -247,6 +260,11 @@ def retired_names(documents: dict[str, Document]) -> list[str]:
     -------
     list of str
         One message per workflow and retired name; empty when none remains.
+
+    Examples
+    --------
+    >>> retired_names({"get-codescene-sha.yml": {"jobs": {}}})
+    ['get-codescene-sha.yml still names get-codescene-sha']
 
     """
     found = [
