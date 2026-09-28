@@ -360,12 +360,33 @@ def _local_actions(name: str, document: Document) -> list[str]:
     return [
         f"{name} runs the local action {step['uses']}, which these rules cannot read"
         for step in steps(name, document)
-        if _is_own_action(str(step.get("uses", "")))
+        if is_own_action(str(step.get("uses", "")))
     ]
 
 
-def _is_own_action(uses: str) -> bool:
-    """Return whether a step's `uses:` runs an action from this repository."""
+def is_own_action(uses: str) -> bool:
+    """Return whether a step's `uses:` runs an action from this repository.
+
+    A local action (`./` or `$/`) and one named as this repository at a ref
+    both run an `action.yml` these rules never read.
+
+    Parameters
+    ----------
+    uses : str
+        A step's `uses:` value.
+
+    Returns
+    -------
+    bool
+        True for a local action or this repository's action at any ref,
+        compared without case.
+
+    Examples
+    --------
+    >>> [is_own_action(u) for u in ("./a", f"{REPOSITORY.upper()}@main", "x/y@v1")]
+    [True, True, False]
+
+    """
     folded_uses = uses.casefold()
     own = REPOSITORY.casefold()
     return uses.startswith(("./", "$/")) or folded_uses.startswith(

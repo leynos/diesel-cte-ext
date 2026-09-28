@@ -156,10 +156,11 @@ the next push supersedes it. A manual re-run of an older run keeps its SHA and
 its run id: it republishes that commit's coverage to CodeScene, but replaces no
 ratchet baseline while the original run's cache entry survives, because the
 shared action saves each baseline under a key that includes the run id. If that
-entry is gone, never saved or since evicted, the re-run saves the older
+entry is gone, never saved or since evicted, a re-run of a push saves the older
 commit's baseline again, the shared action restores the newest entry under the
 key prefix, and later ratchets read the older baseline until the next push
-saves a newer one. That stale-order risk is accepted.
+saves a newer one. That stale-order risk is accepted. A re-run of a dispatch
+saves no baseline, since the shared action saves one only on a push.
 
 Two gaps are known and accepted, and both are tracked in
 [shared-actions issue 518](https://github.com/leynos/shared-actions/issues/518):

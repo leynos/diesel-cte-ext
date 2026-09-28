@@ -24,6 +24,7 @@ from codescene_contract_support import (
 )
 from codescene_coverage_rules import coverage_violations
 from codescene_publisher_rules import publisher_violations, retired_names
+from codescene_pull_request_rules import REPOSITORY
 
 if typ.TYPE_CHECKING:
     import collections.abc as cabc
@@ -223,6 +224,14 @@ def test_pull_request_coverage_cannot_be_switched_off(
     assert_reports(coverage_violations, documents, "may run only as")
 
 
+def test_pull_request_coverage_job_cannot_wait_on_another(
+    documents: Documents,
+) -> None:
+    """A skipped prerequisite skips the coverage job with it, and nothing fails."""
+    first_job(documents[LANE])["needs"] = "gate"
+    assert_reports(coverage_violations, documents, "job must not wait on another job")
+
+
 @pytest.mark.parametrize(
     "guard", ["false", "github.event_name == 'workflow_dispatch'", "always()"]
 )
@@ -330,7 +339,14 @@ def test_publisher_callee_cannot_write_a_second_baseline(documents: Documents) -
     )
 
 
-@pytest.mark.parametrize("uses", ["./.github/actions/cov", "$/.github/actions/cov"])
+@pytest.mark.parametrize(
+    "uses",
+    [
+        "./.github/actions/cov",
+        "$/.github/actions/cov",
+        f"{REPOSITORY}/.github/actions/cov@main",
+    ],
+)
 @pytest.mark.parametrize("caller", ["publisher", "push callee"])
 def test_push_cannot_run_a_local_action(
     documents: Documents, uses: str, caller: str

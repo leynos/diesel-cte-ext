@@ -190,6 +190,7 @@ def test_upload_reads_what_coverage_wrote(
         "${{{{ github.workspace }}}}",
         "../repo",
         "/home/runner/work",
+        "C:\\runner\\work",
         "dist/\n{report}",
     ],
 )
@@ -223,7 +224,9 @@ def test_a_directory_holding_the_report_is_refused(documents: Documents) -> None
     assert_reports(coverage_violations, documents, "must not upload the coverage")
 
 
-@pytest.mark.parametrize("path", ["dist", "target/nextest/junit.xml\n!**/lcov.info"])
+@pytest.mark.parametrize(
+    "path", ["dist", "..cache", "target/nextest/junit.xml\n!**/lcov.info"]
+)
 def test_pull_request_lane_may_upload_other_files(
     documents: Documents, path: str
 ) -> None:

@@ -8,13 +8,12 @@ selects, at the same pin; and nothing else may write a baseline.
 
 from __future__ import annotations
 
-import posixpath
 import re
 import typing as typ
-from pathlib import PurePosixPath
+from pathlib import PureWindowsPath
 
 from codescene_publisher_rules import READ_ONLY, upload_steps
-from codescene_pull_request_rules import closure, pull_request_closure
+from codescene_pull_request_rules import closure, is_own_action, pull_request_closure
 from codescene_workflow_reader import (
     Document,
     Step,
@@ -75,7 +74,8 @@ def _pull_request_lane(
     workflow also answers a push to main, and an unguarded step would then
     write a second baseline there, outside the publisher's concurrency group.
     A guard on the holding job could only narrow it, down to `false`, while
-    the step still read as guarded.
+    the step still read as guarded, and a `needs:` prerequisite that is
+    skipped skips the job with it.
     """
     job = holding_job(name, document, step)
     return [
@@ -83,6 +83,7 @@ def _pull_request_lane(
         for problem, failed in (
             ("must not continue on error", any(map(continues_on_error, (step, job)))),
             ("job must run unconditionally", "if" in job),
+            ("job must not wait on another job", "needs" in job),
             (
                 f"may run only as `{PULL_REQUEST_GUARD}`",
                 step.get("if") != PULL_REQUEST_GUARD,
@@ -220,11 +221,38 @@ def _may_hold(path: str, report: str) -> bool:
     """
     if any(marker in path for marker in ("*", "?", "[", "$", "~")):
         return True
-    literal = PurePosixPath(posixpath.normpath(path.replace("\\", "/")))
-    if literal.is_absolute() or literal.parts[:1] in {(), ("..",)}:
+    literal = _components(path)
+    if not literal:
         return True
-    target = PurePosixPath(posixpath.normpath(report))
-    return literal == target or literal in target.parents
+    target = _components(report)
+    return target is None or target[: len(literal)] == literal
+
+
+def _components(path: str) -> list[str] | None:
+    r"""Return a relative path's components with `.` dropped and `..` folded.
+
+    Parsed as a Windows path, so `/` and `\` both separate and a drive such
+    as `C:` anchors it. An anchored path, or one whose `..` climbs above its
+    start, has no components under the workspace and yields None.
+
+    Examples
+    --------
+    >>> [_components(p) for p in ("a/./b\\c", "a/../b", "../x", "C:\\x", "/x")]
+    [['a', 'b', 'c'], ['b'], None, None, None]
+
+    """
+    pure = PureWindowsPath(path)
+    if pure.anchor:
+        return None
+    parts: list[str] = []
+    for part in pure.parts:
+        if part != "..":
+            parts.append(part)
+        elif parts:
+            parts.pop()
+        else:
+            return None
+    return parts
 
 
 def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:
@@ -252,17 +280,18 @@ def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:
 
 
 def _push_local_actions(reached: dict[str, Document]) -> list[str]:
-    """Report a local action a push runs, publisher included.
+    """Report a local action, or this repository's at a ref, a push runs.
 
     Its `action.yml` is not read by these rules, so it could generate coverage
     and write a second baseline unseen; it is refused rather than followed.
+    The publisher is included.
     """
     return [
         f"{name} runs the local action {step['uses']} on a push, "
         "which these rules cannot read"
         for name, document in reached.items()
         for step in steps(name, document)
-        if str(step.get("uses", "")).startswith(("./", "$/"))
+        if is_own_action(str(step.get("uses", "")))
     ]
 
 
