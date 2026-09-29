@@ -73,7 +73,7 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 		jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)' \
 	)" && \
 	test -n "$$manifest_path" && \
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
+	RUSTFLAGS="$(if $(PG_WORKER_IS_RELEASE_PROFILE),$${RUSTFLAGS-},$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS))" $(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
 	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" "$(PG_WORKER_PATH)"
 
 test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
