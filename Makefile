@@ -49,7 +49,8 @@ PG_DATA_DIR ?= $(PG_EMBED_BASE)/data
 # `rustflags` table in .cargo/config.toml, so each recipe that sets it
 # composes this onto any inherited value (CI's setup-rust exports one),
 # except coverage, which stays on the platform linker.
-STANDARD_RUSTFLAGS := $(if $(filter Linux,$(shell uname -s)),-Clink-arg=-fuse-ld=mold)
+BUILD_HOST_OS := $(shell uname -s)
+STANDARD_RUSTFLAGS := $(if $(filter Linux,$(BUILD_HOST_OS)),-Clink-arg=-fuse-ld=mold)
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
