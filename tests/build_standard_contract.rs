@@ -21,20 +21,20 @@
 //! repository's own compliant files would pass whether or not it detects
 //! anything.
 
+#[path = "build_standard_support/ci_steps.rs"]
+mod ci_steps;
 #[path = "build_standard_support/config.rs"]
 mod config;
 #[path = "build_standard_support/make.rs"]
 mod make;
-#[path = "build_standard_support/workflows.rs"]
-mod workflows;
 use rstest::rstest;
 
+use ci_steps::{install_mold_problems, workflow_problems};
 use config::{CONFIG, Flags, Pin, Problems, THREADS_FLAG, TOOLCHAIN, config_problems};
 use make::{
     Assignment, Host, assigned_rustflags, commands_from, development_problems, held_out_problems,
     held_out_target_count,
 };
-use workflows::{install_mold_problems, workflow_problems};
 
 /// Turns a list of complaints into a test result.
 fn none_of(problems: &Problems) -> Result<(), String> {
@@ -255,17 +255,10 @@ fn the_workflow_reader_wants_the_input_on_each_step(
 
 /// Every workflow that builds under the standard installs mold. A repository
 /// whose workflows do not set up Rust through `setup-rust` lists none, and the
-/// check then reads no step; otherwise it must read at least one.
+/// check then reads nothing; a listed workflow must have a step to read.
 #[test]
 fn every_setup_rust_step_installs_mold() -> Result<(), String> {
-    let (problems, read) = workflow_problems();
-    none_of(&problems)?;
-    if !workflows::WORKFLOWS.is_empty() && read == 0 {
-        return Err(
-            "the listed workflows have no setup-rust step, so the check proves nothing".to_owned(),
-        );
-    }
-    Ok(())
+    none_of(&workflow_problems())
 }
 
 /// Scenario: a recipe continued over lines, beside an `echo` and another command.

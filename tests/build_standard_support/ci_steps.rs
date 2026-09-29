@@ -101,16 +101,22 @@ pub fn install_mold_problems(name: &str, workflow: &str) -> Problems {
         .collect()
 }
 
-/// Returns every complaint about the listed workflows, and how many `setup-rust`
-/// steps it read, so a test can refuse to pass over nothing.
-pub fn workflow_problems() -> (Problems, usize) {
-    let problems = WORKFLOWS
+/// Returns the complaints about one listed workflow: a step without the input,
+/// or no `setup-rust` step at all, which would leave the check reading nothing.
+fn listed_problems(name: &str, workflow: &str) -> Problems {
+    let mut problems = install_mold_problems(name, workflow);
+    if !workflow.contains("setup-rust@") {
+        problems.push(format!(
+            "{name}: the listed workflow has no setup-rust step, so the check proves nothing"
+        ));
+    }
+    problems
+}
+
+/// Returns every complaint about the listed workflows.
+pub fn workflow_problems() -> Problems {
+    WORKFLOWS
         .iter()
-        .flat_map(|(name, text)| install_mold_problems(name, text))
-        .collect();
-    let read = WORKFLOWS
-        .iter()
-        .map(|(_, text)| text.matches("setup-rust@").count())
-        .sum();
-    (problems, read)
+        .flat_map(|(name, text)| listed_problems(name, text))
+        .collect()
 }
