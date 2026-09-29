@@ -292,7 +292,7 @@ For usage details, see
 
 ## The build standard
 
-Development, test, lint and typecheck builds use the `mold` linker on Linux;
+Development, test, lint, and typecheck builds use the `mold` linker on Linux;
 the parallel frontend flag is nightly-only, and the pinned `1.94.0` is stable,
 so it is not used. These are defaults in `.cargo/config.toml`, which Cargo
 discovers on its own, so a bare `cargo build` gets them. `mold` ships for Linux
@@ -314,8 +314,9 @@ On Linux, install `mold` before building: the configuration names it, so a
 build without it fails at link time. CI installs it through `setup-rust`'s
 `install-mold` input. `tests/build_standard_contract.rs` holds the standard. It
 reads the configuration sources, and the commands `make -n` prints for each
-development, coverage and release target on a Linux host and a macOS host, so a
-flag lost through a recipe edit fails there.
+development target on a Linux host and a macOS host, and for each coverage and
+release target on a Linux host, so a flag lost through a recipe edit fails
+there.
 
 ### Cranelift
 
