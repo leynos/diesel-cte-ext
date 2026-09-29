@@ -8,13 +8,12 @@ selects, at the same pin; and nothing else may write a baseline.
 
 from __future__ import annotations
 
-import posixpath
 import re
 import typing as typ
-from pathlib import PurePosixPath
+from pathlib import PureWindowsPath
 
 from codescene_publisher_rules import READ_ONLY, upload_steps
-from codescene_pull_request_rules import closure, pull_request_closure
+from codescene_pull_request_rules import closure, is_own_action, pull_request_closure
 from codescene_workflow_reader import (
     Document,
     Step,
@@ -48,6 +47,12 @@ def coverage_steps(name: str, document: Document) -> list[Step]:
     list of Step
         Every step calling the shared coverage action, in order.
 
+    Examples
+    --------
+    >>> step = {"uses": f"{COVERAGE_ACTION}@v1"}
+    >>> coverage_steps("ci.yml", {"jobs": {"t": {"steps": [{"run": "true"}, step]}}})
+    [{'uses': 'leynos/shared-actions/.github/actions/generate-coverage@v1'}]
+
     """
     return [step for step in steps(name, document) if calls(step, COVERAGE_ACTION)]
 
@@ -63,30 +68,43 @@ def _selection(step: Step) -> dict[str, object]:
 def _pull_request_lane(
     name: str, document: Document, step: Step, trunk: Step
 ) -> list[str]:
-    """Report a pull-request coverage step that cannot ratchet like main."""
-    inputs = step.get("with")
-    inputs = inputs if isinstance(inputs, dict) else {}
-    found = [
-        f"{name} coverage must not continue on error"
-        for scope in (step, holding_job(name, document, step))
-        if continues_on_error(scope)
+    """Report a pull-request coverage step that cannot ratchet like main.
+
+    The step's own guard is required, not merely permitted: the lane's
+    workflow also answers a push to main, and an unguarded step would then
+    write a second baseline there, outside the publisher's concurrency group.
+    A guard on the holding job could only narrow it, down to `false`, while
+    the step still read as guarded, and a `needs:` prerequisite that is
+    skipped skips the job with it.
+    """
+    job = holding_job(name, document, step)
+    return [
+        f"{name} coverage {problem}"
+        for problem, failed in (
+            ("must not continue on error", any(map(continues_on_error, (step, job)))),
+            ("job must run unconditionally", "if" in job),
+            ("job must not wait on another job", "needs" in job),
+            (
+                f"may run only as `{PULL_REQUEST_GUARD}`",
+                step.get("if") != PULL_REQUEST_GUARD,
+            ),
+            ("must set with-ratchet 'true'", _with(step, "with-ratchet") != "true"),
+            (
+                "must set publish-artefact 'false'",
+                _with(step, "publish-artefact") != "false",
+            ),
+            (
+                "selection differs from the publisher's",
+                _selection(step) != _selection(trunk),
+            ),
+            ("pin differs from the publisher's", step.get("uses") != trunk.get("uses")),
+            (
+                f"job permissions must be exactly {READ_ONLY}",
+                job.get("permissions") != READ_ONLY,
+            ),
+        )
+        if failed
     ]
-    # Required, not merely permitted: the lane's workflow also answers a push
-    # to main, and an unguarded step would then write a second baseline there,
-    # outside the publisher's concurrency group.
-    if step.get("if") != PULL_REQUEST_GUARD:
-        found.append(f"{name} coverage may run only as `{PULL_REQUEST_GUARD}`")
-    if inputs.get("with-ratchet") != "true":
-        found.append(f"{name} coverage must set with-ratchet 'true'")
-    if inputs.get("publish-artefact") != "false":
-        found.append(f"{name} coverage must set publish-artefact 'false'")
-    if _selection(step) != _selection(trunk):
-        found.append(f"{name} coverage selection differs from the publisher's")
-    if step.get("uses") != trunk.get("uses"):
-        found.append(f"{name} coverage pin differs from the publisher's")
-    if holding_job(name, document, step).get("permissions") != READ_ONLY:
-        found.append(f"{name} coverage job permissions must be exactly {READ_ONLY}")
-    return found
 
 
 def _trunk_violations(publisher: str, trunk: Step, upload: Step) -> list[str]:
@@ -133,6 +151,12 @@ def coverage_violations(documents: dict[str, Document]) -> list[str]:
     -------
     list of str
         One message per violation; empty when the repository complies.
+
+    Examples
+    --------
+    >>> from codescene_contract_support import fresh_documents
+    >>> coverage_violations(fresh_documents())
+    []
 
     """
     uploads = upload_steps(documents)
@@ -197,11 +221,38 @@ def _may_hold(path: str, report: str) -> bool:
     """
     if any(marker in path for marker in ("*", "?", "[", "$", "~")):
         return True
-    literal = PurePosixPath(posixpath.normpath(path.replace("\\", "/")))
-    if literal.is_absolute() or literal.parts[:1] in {(), ("..",)}:
+    literal = _components(path)
+    if not literal:
         return True
-    target = PurePosixPath(posixpath.normpath(report))
-    return literal == target or literal in target.parents
+    target = _components(report)
+    return target is None or target[: len(literal)] == literal
+
+
+def _components(path: str) -> list[str] | None:
+    r"""Return a relative path's components with `.` dropped and `..` folded.
+
+    Parsed as a Windows path, so `/` and `\` both separate and a drive such
+    as `C:` anchors it. An anchored path, or one whose `..` climbs above its
+    start, has no components under the workspace and yields None.
+
+    Examples
+    --------
+    >>> [_components(p) for p in ("a/./b\\c", "a/../b", "../x", "C:\\x", "/x")]
+    [['a', 'b', 'c'], ['b'], None, None, None]
+
+    """
+    pure = PureWindowsPath(path)
+    if pure.anchor:
+        return None
+    parts: list[str] = []
+    for part in pure.parts:
+        if part != "..":
+            parts.append(part)
+        elif parts:
+            parts.pop()
+        else:
+            return None
+    return parts
 
 
 def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:
@@ -210,19 +261,37 @@ def _push_writers(documents: dict[str, Document], publisher: str) -> list[str]:
     Such a step writes a second baseline on every push to main, outside the
     publisher's concurrency group. The push side is followed through local
     calls as the pull-request side is, since a called workflow runs on its
-    caller's push.
+    caller's push; the publisher is a seed too, so its own callees are judged,
+    and only its own document is exempt.
     """
     seeds = {
         name
         for name, document in documents.items()
-        if name != publisher and "push" in triggers(name, document)
+        if "push" in triggers(name, document)
     }
+    reached = closure(seeds, documents)
     return [
         f"{name} coverage can run on a push; guard it to pull requests"
-        for name, document in closure(seeds, documents).items()
+        for name, document in reached.items()
         if name != publisher
         for step in coverage_steps(name, document)
         if step.get("if") != PULL_REQUEST_GUARD
+    ] + _push_local_actions(reached)
+
+
+def _push_local_actions(reached: dict[str, Document]) -> list[str]:
+    """Report a local action, or this repository's at a ref, a push runs.
+
+    Its `action.yml` is not read by these rules, so it could generate coverage
+    and write a second baseline unseen; it is refused rather than followed.
+    The publisher is included.
+    """
+    return [
+        f"{name} runs the local action {step['uses']} on a push, "
+        "which these rules cannot read"
+        for name, document in reached.items()
+        for step in steps(name, document)
+        if is_own_action(str(step.get("uses", "")))
     ]
 
 

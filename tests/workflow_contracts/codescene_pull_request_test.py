@@ -19,7 +19,11 @@ from codescene_contract_support import (
     job_steps,
     lane_jobs,
 )
-from codescene_pull_request_rules import pull_request_closure, pull_request_contacts
+from codescene_pull_request_rules import (
+    REPOSITORY,
+    pull_request_closure,
+    pull_request_contacts,
+)
 from codescene_workflow_reader import (
     Document,
     WorkflowError,
@@ -102,7 +106,7 @@ def test_workflow_run_matches_an_unnamed_workflow_by_path(
     [
         ("$/.github/workflows/ci.yml@main", "a `\\$/` call cannot name a ref"),
         (
-            "leynos/diesel-cte-ext/.github/workflows/ci.yml@main",
+            f"{REPOSITORY}/.github/workflows/ci.yml@main",
             "runs this repository's workflow at a ref",
         ),
         ("./.github/workflows/missing.yml", "names no workflow in this repository"),
@@ -180,7 +184,13 @@ def test_closure_refuses_an_unreadable_workflow_run_list(
 
 
 @pytest.mark.parametrize(
-    "uses", ["./.github/actions/probe", "$/.github/actions/probe"]
+    "uses",
+    [
+        "./.github/actions/probe",
+        "$/.github/actions/probe",
+        f"{REPOSITORY}/.github/actions/probe@some-branch",
+        f"{REPOSITORY.upper()}@some-branch",
+    ],
 )
 def test_pull_request_lane_cannot_run_a_local_action(
     documents: Documents, uses: str
@@ -221,6 +231,7 @@ def test_callee_secret_declaration_is_refused(documents: Documents) -> None:
         ),
         ({"run": "echo '${{ toJSON( secrets ) }}'"}, "serializes the secrets context"),
         ({"run": "echo ${{ secrets['CS_' + 'X'] }}"}, "indexes the secrets context"),
+        ({"run": "echo ${{ join(secrets.*, ',') }}"}, "filters the secrets context"),
         ({"run": "curl https://API.CODESCENE.IO"}, "names the CodeScene host"),
         ({"run": "cs-coverage check coverage.xml"}, "names the cs-coverage client"),
         (
