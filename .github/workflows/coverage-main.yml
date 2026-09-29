@@ -57,6 +57,12 @@ jobs:
       # The selection is the baseline every pull request's ratchet is measured
       # against, so ci.yml's must match it field for field.
       - name: Generate coverage
+        env:
+          # One of the two exclusions from the build standard: a coverage build is
+          # a measurement, so it takes neither the parallel frontend nor the mold
+          # linker. Assigning RUSTFLAGS displaces every `rustflags` table in
+          # .cargo/config.toml.
+          RUSTFLAGS: -D warnings
         uses: leynos/shared-actions/.github/actions/generate-coverage@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
         with:
           output-path: lcov.info
