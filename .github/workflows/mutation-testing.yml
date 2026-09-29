@@ -46,4 +46,7 @@ jobs:
       # embedded cluster bound to localhost inside the CI job; it is
       # not a secret.
       setup-commands: |
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends mold
         echo "PG_PASSWORD=cargo-mutants-embedded-pg" >> "$GITHUB_ENV"
