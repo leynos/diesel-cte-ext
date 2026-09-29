@@ -34,6 +34,9 @@ EXPECTED_WITH = {
     "exclude-globs": "src/test_support.rs",
     "extra-args": "--all-features",
     "setup-commands": (
+        "export DEBIAN_FRONTEND=noninteractive\n"
+        "sudo apt-get update\n"
+        "sudo apt-get install --yes --no-install-recommends mold\n"
         'echo "PG_PASSWORD=cargo-mutants-embedded-pg" >> "$GITHUB_ENV"\n'
     ),
 }
