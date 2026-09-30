@@ -26,8 +26,10 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC workflow-source resolution
-    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+    uses: leynos/shared-actions/.github/workflows/mutation-cargo.yml@9a27950942334d69ff79005b3a8db23bf151f43f
     with:
+      # .cargo/config.toml links with mold on Linux; the reusable workflow installs it.
+      install-mold: 'true'
       # Test-support scaffolding used only by unit tests; its survivors
       # are noise.
       exclude-globs: "src/test_support.rs"
@@ -46,7 +48,4 @@ jobs:
       # embedded cluster bound to localhost inside the CI job; it is
       # not a secret.
       setup-commands: |
-        export DEBIAN_FRONTEND=noninteractive
-        sudo apt-get update
-        sudo apt-get install --yes --no-install-recommends mold
         echo "PG_PASSWORD=cargo-mutants-embedded-pg" >> "$GITHUB_ENV"
