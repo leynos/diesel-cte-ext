@@ -31,6 +31,8 @@ WORKFLOW_PATH = (
 #: second and subsequent per-mutant runs fail to connect). Every other
 #: input keeps the reusable workflow's default.
 EXPECTED_WITH = {
+    # .cargo/config.toml links with mold on Linux; the reusable workflow installs it.
+    "install-mold": "true",
     "exclude-globs": "src/test_support.rs",
     "extra-args": "--all-features",
     "setup-commands": (
