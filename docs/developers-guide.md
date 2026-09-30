@@ -181,23 +181,23 @@ publisher is the only baseline writer. Both coverage steps select the same
 inputs at the same `shared-actions` pin because the pull-request ratchet is
 only meaningful against a baseline measured the same way.
 
-`make test-workflow-contracts` holds this shape. The contract tests are
-`codescene_pull_request_test.py`, `codescene_publisher_test.py` and
-`codescene_token_test.py` under `tests/workflow_contracts/`, with the rules in
-the `codescene_*_rules.py` modules beside them, the strict workflow reader in
-`codescene_workflow_reader.py`, and the scalar flattening the marker rules
-share in `codescene_workflow_text.py`. The rules read every workflow a pull
-request can start, from its own events, reviews and comments, a merge queue, or
-a push not confined to `main` or tags, following local reusable-workflow calls
-and `workflow_run` chains, and refuse any mention of the CodeScene host,
-uploader, client, or token there, and any local action or action named as this
-repository at a ref, whose `action.yml` they do not read. They also refuse
-`continue-on-error` wherever it would turn a failed ratchet or upload green,
-and any `if:` on the job holding the pull-request coverage step, whose own
-guard already selects pull requests. The upload guard is compared as an exact
-set of conjuncts, so an `||` hidden inside an extra conjunct fails the
-comparison without a separate scan. Each clause has a test that mutates the
-workflows and expects the clause to refuse the result.
+`make test-workflow-contracts` holds this shape by running
+`cv005-contracts check`, the shared contract library in `leynos/shared-actions`
+(`packages/cv005-contracts`), from a full commit named by `CV005_CONTRACTS_REF`
+in the Makefile, and CI runs it as its own step. A fix to the rules is
+therefore a pin bump. The target needs `uv`, which fetches the Python 3.13 the
+library runs under. The repository's parameters are in `.github/cv005.toml`: its
+`repository` name and the `[selection]` inputs the baseline measures, which
+the publisher's generator must carry and every pull-request lane must match.
+The library's own suite proves each rule refuses the shape it exists to refuse,
+so this repository keeps no copy of the readers or the refusal cases. Its rules
+read every workflow a pull request can start, from its own events, reviews and
+comments, a merge queue, or a push not confined to `main` or tags, following
+local reusable-workflow calls, `workflow_run` chains and local composite
+actions, and refuse any mention of the CodeScene host, uploader, client, or
+token there. They also refuse `continue-on-error` wherever it would turn a
+failed ratchet or upload green, and they read workflows strictly, so a
+duplicate key is refused rather than silently resolved.
 
 ## Compile-fail UI tests
 
