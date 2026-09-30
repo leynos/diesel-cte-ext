@@ -28,7 +28,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           version: "0.6.0"
       - name: Format
@@ -69,11 +69,8 @@ jobs:
       - name: Test and Measure Coverage
         if: github.event_name == 'pull_request'
         env:
-          # One of the two exclusions from the build standard: a coverage build is
-          # a measurement, so it takes neither the parallel frontend nor the mold
-          # linker. Assigning RUSTFLAGS displaces every `rustflags` table in
-          # .cargo/config.toml.
           RUSTFLAGS: -D warnings
+          GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
         with:
           output-path: lcov.info
