@@ -186,16 +186,18 @@ only meaningful against a baseline measured the same way.
 (`packages/cv005-contracts`), from a full commit named by `CV005_CONTRACTS_REF`
 in the Makefile, and CI runs it as its own step. A fix to the rules is
 therefore a pin bump. The target needs `uv`, which fetches the Python 3.13 the
-library runs under. The repository's only parameter is `repository` in
-`.github/cv005.toml`. The library's own suite proves each rule refuses the
-shape it exists to refuse, so this repository keeps no copy of the readers or
-the refusal cases. Its rules read every workflow a pull request can start, from
-its own events, reviews and comments, a merge queue, or a push not confined to
-`main` or tags, following local reusable-workflow calls, `workflow_run` chains
-and local composite actions, and refuse any mention of the CodeScene host,
-uploader, client, or token there. They also refuse `continue-on-error` wherever
-it would turn a failed ratchet or upload green, and they read workflows
-strictly, so a duplicate key is refused rather than silently resolved.
+library runs under. The repository's parameters are in `.github/cv005.toml`: its
+`repository` name and the `[selection]` inputs the baseline measures, which
+the publisher's generator must carry and every pull-request lane must match.
+The library's own suite proves each rule refuses the shape it exists to refuse,
+so this repository keeps no copy of the readers or the refusal cases. Its rules
+read every workflow a pull request can start, from its own events, reviews and
+comments, a merge queue, or a push not confined to `main` or tags, following
+local reusable-workflow calls, `workflow_run` chains and local composite
+actions, and refuse any mention of the CodeScene host, uploader, client, or
+token there. They also refuse `continue-on-error` wherever it would turn a
+failed ratchet or upload green, and they read workflows strictly, so a
+duplicate key is refused rather than silently resolved.
 
 ## Compile-fail UI tests
 
