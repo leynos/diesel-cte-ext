@@ -66,6 +66,8 @@ jobs:
       # artefact and never contacts CodeScene.
       - name: Test and Measure Coverage
         if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
         with:
           output-path: lcov.info
