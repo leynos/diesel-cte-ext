@@ -3,7 +3,7 @@ name: Coverage (main)
 # Main owns both persistent coverage outputs: the ratchet baseline and the
 # CodeScene upload. Pull requests generate coverage only for their own ratchet
 # check, in ci.yml; they neither publish a report nor contact CodeScene, and
-# the CV-005 contract tests under tests/workflow_contracts hold that shape.
+# `make test-workflow-contracts` holds that shape.
 #
 # The CodeScene call is what moves here, not the artefact: the shared uploader
 # pins the cs-coverage archive by digest, but the tool talks to CodeScene's API
@@ -28,10 +28,11 @@ on:
 # order. A manual re-run of an older run keeps its SHA and its run id: it
 # republishes that commit's coverage to CodeScene, but replaces no ratchet
 # baseline while the original run's cache entry survives. If that entry is
-# gone, never saved or since evicted, the re-run saves the older commit's
-# baseline as the newest entry, and later ratchets read it until the next push
-# saves a newer one: an accepted stale-order risk. The group is not keyed on
-# the event, which would let a dispatch and a push to main run at once.
+# gone, never saved or since evicted, a re-run of a push saves the older
+# commit's baseline as the newest entry, and later ratchets read it until the
+# next push saves a newer one: an accepted stale-order risk. A re-run of a
+# dispatch saves no baseline. The group is not keyed on the event, which would
+# let a dispatch and a push to main run at once.
 concurrency:
   group: coverage-main-${{ github.ref }}
   cancel-in-progress: false
@@ -53,7 +54,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@8a83824b29dfe8f861714b544dc85fb925ed010c
+        uses: leynos/shared-actions/.github/actions/setup-rust@b7d70b5d3ff0ac0199416b9678ea7af25bb3254e
         with:
           install-mold: 'true'
       # The selection is the baseline every pull request's ratchet is measured
