@@ -604,7 +604,7 @@ dependencies = [
  "mutants",
  "pg-embed-setup-unpriv",
  "proptest",
- "rstest 0.27.0",
+ "rstest",
  "tokio",
  "trybuild",
 ]
@@ -673,9 +673,9 @@ dependencies = [
 
 [[package]]
 name = "dirs"
-version = "6.0.0"
+version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
 dependencies = [
  "dirs-sys 0.5.0",
 ]
@@ -922,6 +922,16 @@ dependencies = [
  "io-lifetimes 2.0.4",
  "rustix",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "fs4"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
+dependencies = [
+ "rustix",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1940,9 +1950,9 @@ dependencies = [
 
 [[package]]
 name = "pg-embed-setup-unpriv"
-version = "0.5.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d1532f44d856d5a9ea2b22915d11234542c10689ba3e575ff559d99085ae170"
+checksum = "4138a96b28dda86101e396f6c3e6ed475dcc4c0205ba3206d463be5d9c3959e6"
 dependencies = [
  "camino",
  "cap-std",
@@ -1951,22 +1961,27 @@ dependencies = [
  "color-eyre",
  "dashmap",
  "diesel",
- "dirs 6.0.0",
+ "dirs 7.0.0",
  "figment",
  "figment-json5",
  "filetime",
+ "flate2",
+ "fs4",
  "libc",
  "nix",
  "ortho_config",
  "postgres",
+ "postgresql_archive",
  "postgresql_embedded",
  "pq-sys",
- "rstest 0.26.1",
+ "reqwest",
+ "rstest",
  "secrecy",
  "serde",
  "serde_json",
  "serde_with",
  "sha2 0.11.0",
+ "tar",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -2431,6 +2446,7 @@ checksum = "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
 dependencies = [
  "base64",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
@@ -2541,42 +2557,13 @@ dependencies = [
 
 [[package]]
 name = "rstest"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
-dependencies = [
- "futures-timer",
- "futures-util",
- "rstest_macros 0.26.1",
-]
-
-[[package]]
-name = "rstest"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "948203e6d13b83e51a90d7cf236dd58a0065f23f4b902f00f306e7eb2bd09b9c"
 dependencies = [
  "futures-timer",
  "futures-util",
- "rstest_macros 0.27.0",
-]
-
-[[package]]
-name = "rstest_macros"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
-dependencies = [
- "cfg-if",
- "glob",
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "regex",
- "relative-path",
- "rustc_version",
- "syn",
- "unicode-ident",
+ "rstest_macros",
 ]
 
 [[package]]
@@ -3166,9 +3153,9 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.44"
+version = "0.4.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
 dependencies = [
  "filetime",
  "libc",
