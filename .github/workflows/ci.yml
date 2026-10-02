@@ -37,7 +37,7 @@ jobs:
       - name: Spelling
         run: make spelling
       - name: Install the Whitaker Dylint suite
-        uses: leynos/shared-actions/.github/actions/install-whitaker@c4ed5ffaf0640b1907d5359a87fd1677034eec27
+        uses: leynos/shared-actions/.github/actions/install-whitaker@ff1dd759dfffc0db3459e30e833f52437ee62b57
       - name: Lint
         run: make lint
       - name: Workflow contract tests
