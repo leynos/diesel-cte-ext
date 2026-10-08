@@ -3,11 +3,15 @@
 ## Contributor toolchain
 
 The pinned Rust toolchain is **1.94.0** and includes `rustfmt`, `clippy`, and
-`rust-analyzer`. The 1.94.0 floor comes from the `pg-embed-setup-unpriv` 0.5.2
-test dependency: its transitive crates (`postgresql_embedded` and `sqlx`)
-require that release, so building the `pg_worker` helper or running `make test`
-on an older toolchain fails during dependency resolution. Run
-`rustup toolchain install` from the repository root after changing
+`rust-analyzer`. The 1.94.0 pin was set when the `pg-embed-setup-unpriv` 0.5.2
+test dependency required that release through its transitive crates. With 0.6.3
+locked, the highest `rust-version` any locked package declares is 1.92
+(`postgresql_embedded`, `postgresql_commands`, `postgresql_archive` and
+`pg-embed-setup-unpriv` itself), read from `cargo metadata --locked`, so the
+dependency tree no longer requires 1.94.0. The pin stays at 1.94.0 because
+lowering the repository's toolchain is a separate decision that this dependency
+bump does not make; the declared floors were not verified by a build on 1.92.
+Run `rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI). Run `make typecheck`
 to type-check every target with all features enabled.
@@ -19,6 +23,10 @@ Run the spelling gate with:
 ```bash
 make spelling
 ```
+
+`TYPOS_CONFIG_BUILDER_VERSION` in the `Makefile` pins the
+`typos-config-builder` release the gate runs (currently `v0.1.3`). Raise it
+together with the regenerated `typos.toml`, never on its own.
 
 The gate enforces en-GB-oxendict spelling in tracked Markdown prose.
 `make markdownlint` depends on it, so linting Markdown also checks spelling.

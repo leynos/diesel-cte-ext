@@ -13,11 +13,10 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.6'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@b7d70b5d3ff0ac0199416b9678ea7af25bb3254e
+        uses: leynos/shared-actions/.github/actions/setup-rust@ff1dd759dfffc0db3459e30e833f52437ee62b57
         with:
           install-mold: 'true'
       - name: Setup uv
@@ -28,7 +27,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@7d751eded578e48dacf43ab173d5820e6437c474
         with:
           version: "0.6.0"
       - name: Format
@@ -39,24 +38,8 @@ jobs:
           globs: '**/*.md'
       - name: Spelling
         run: make spelling
-      - name: Cache whitaker-installer
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: |
-            ~/.cargo/bin/whitaker-installer
-            ~/.cache/cargo-binstall
-          key: whitaker-installer-${{ runner.os }}-${{ runner.arch }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install the Whitaker Dylint suite
-        run: |
-          if ! command -v whitaker-installer >/dev/null 2>&1; then
-            if cargo binstall --version >/dev/null 2>&1; then
-              cargo binstall --no-confirm --locked "whitaker-installer@${WHITAKER_INSTALLER_VERSION}"
-            else
-              echo "cargo-binstall unavailable; building whitaker-installer from crates.io"
-              cargo install --locked whitaker-installer --version "${WHITAKER_INSTALLER_VERSION}"
-            fi
-          fi
-          whitaker-installer
+        uses: leynos/shared-actions/.github/actions/install-whitaker@c4ed5ffaf0640b1907d5359a87fd1677034eec27
       - name: Lint
         run: make lint
       - name: Workflow contract tests
@@ -71,7 +54,7 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
           GITHUB_TOKEN: ${{ github.token }}
-        uses: leynos/shared-actions/.github/actions/generate-coverage@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           output-path: lcov.info
           format: lcov
