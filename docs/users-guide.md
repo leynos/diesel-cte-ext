@@ -303,3 +303,25 @@ The suite deliberately does not use an external PostgreSQL test URL. Embedded
 PostgreSQL keeps local, Continuous Integration, and sandboxed agent runs on the
 same lifecycle and authentication path, which makes failures easier to
 reproduce across environments.
+
+### Build standard
+
+Development builds (`make test`, `make lint`, `make typecheck` and the debug
+build) use the `mold` linker on Linux (the parallel frontend flag is
+nightly-only, and this repository pins a stable toolchain). Install `mold`
+before building on Linux: the configuration names it, so a build without it
+fails at link time.
+
+The flags live in `.cargo/config.toml`, but Cargo applies exactly one
+`rustflags` source and an assigned `RUSTFLAGS` replaces every configuration
+source. The Makefile therefore restates the flags in each recipe and keeps any
+`RUSTFLAGS` you set, appending the standard flags after yours. Two builds are
+held out on purpose: the coverage build assigns its own flags, because a
+measurement should not depend on the fast flags, and the release build.
+`make release` keeps your `RUSTFLAGS` and names neither fast flag, so a shipped
+artefact links with the platform linker. A bare `cargo build --release` is
+different: it takes the configuration's flags unless you assign `RUSTFLAGS`
+yourself, for example `RUSTFLAGS="" cargo build --release`.
+
+Cranelift is not adopted; the developers' guide records the measurement and the
+reason. See [ADR 001](adr-001-rust-build-standard.md) for the reasoning.

@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@ff1dd759dfffc0db3459e30e833f52437ee62b57
+        with:
+          install-mold: 'true'
       - name: Setup uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
         with:
@@ -50,6 +52,7 @@ jobs:
       - name: Test and Measure Coverage
         if: github.event_name == 'pull_request'
         env:
+          RUSTFLAGS: -D warnings
           GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:

@@ -52,6 +52,15 @@ PG_EMBED_BASE ?= $(CURDIR)/target/pg-embed-runs/$(PG_EMBED_RUN_ID)
 PG_RUNTIME_DIR ?= $(PG_EMBED_BASE)/runtime
 PG_DATA_DIR ?= $(PG_EMBED_BASE)/data
 
+# The development build standard (concordat rule `rust-build-defaults`):
+# the mold linker on Linux. The pin is stable, so the nightly-only parallel
+# frontend flag is not used. An assigned RUSTFLAGS replaces every
+# `rustflags` table in .cargo/config.toml, so each recipe that sets it
+# composes this onto any inherited value (CI's setup-rust exports one),
+# except coverage, which stays on the platform linker.
+BUILD_HOST_OS := $(shell uname -s)
+STANDARD_RUSTFLAGS := $(if $(filter Linux,$(BUILD_HOST_OS)),-Clink-arg=-fuse-ld=mold)
+
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
@@ -63,7 +72,7 @@ clean: ## Remove build artifacts
 test: prepare-pg-worker ## Run tests with warnings treated as errors
 	mkdir -p "$(PG_EMBED_BASE)"
 	chmod 1777 "$(PG_EMBED_BASE)"
-	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
+	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
 
 prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 	mkdir -p "$(dir $(PG_WORKER_PATH))"
@@ -73,7 +82,7 @@ prepare-pg-worker: ## Build the locked pg_worker helper used by PostgreSQL tests
 		jq -r 'first(.packages[] | select(.name == "pg-embed-setup-unpriv") | .manifest_path)' \
 	)" && \
 	test -n "$$manifest_path" && \
-	$(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
+	RUSTFLAGS="$(if $(PG_WORKER_IS_RELEASE_PROFILE),$${RUSTFLAGS-},$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS))" $(CARGO) build --locked --manifest-path "$$manifest_path" --bin pg_worker --profile "$(PG_WORKER_PROFILE)" --target-dir "$(CURDIR)/target" $(BUILD_JOBS) && \
 	install -m 0755 "$(CURDIR)/target/$(PG_WORKER_BUILD_DIR)/pg_worker" "$(PG_WORKER_PATH)"
 
 test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
@@ -84,15 +93,15 @@ test-workflow-contracts: ## Validate the mutation-testing and CodeScene coverage
 	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
+	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
 
 lint: ## Run Clippy and the Whitaker Dylint suite with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
-	$(CARGO) clippy $(CLIPPY_FLAGS)
-	RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check every target with all features enabled
-	$(CARGO) check $(CARGO_FLAGS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
