@@ -1,7 +1,6 @@
-.PHONY: interrogate
 .PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint \
 	nixie prepare-pg-worker spelling \
-	test-prepare-pg-worker test-workflow-contracts
+	test-prepare-pg-worker test-workflow-contracts interrogate
 
 
 TARGET ?= libdiesel-cte-ext.rlib
