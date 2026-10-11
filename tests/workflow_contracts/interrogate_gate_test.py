@@ -161,18 +161,21 @@ def test_the_target_fails_when_the_tool_fails(tmp_path: Path) -> None:
     assert result.returncode != 0
 
 
-def test_the_target_fails_on_a_missed_row_the_percentage_hid(tmp_path: Path) -> None:
-    """Rounded to 100.0% and exit 0, a MISSED row still fails the target."""
-    result = _run_target(
-        tmp_path, "echo '| f.main (L3) |  MISSED |'\necho 'RESULT: PASSED'\nexit 0\n"
-    )
-    assert result.returncode != 0
-    assert "undocumented definitions remain" in result.stderr
+@pytest.mark.parametrize(
+    "cell",
+    ["|  MISSED |", "|   MISSED    |"],
+    ids=["interrogate-default-padding", "wider-padding"],
+)
+def test_the_target_fails_on_a_missed_row_the_percentage_hid(
+    tmp_path: Path, cell: str
+) -> None:
+    """Rounded to 100.0% with exit 0, a MISSED row still fails the target.
 
-
-def test_the_target_fails_on_a_padded_missed_row(tmp_path: Path) -> None:
-    """The guard must not depend on how many spaces pad the status cell."""
+    The guard must not depend on how many spaces pad the status cell.
+    """
     result = _run_target(
-        tmp_path, "echo '| f.main (L3) |   MISSED    |'\necho 'RESULT: PASSED'\nexit 0\n"
+        tmp_path,
+        f"echo '| f.main (L3) {cell}'\necho 'RESULT: PASSED'\nexit 0\n",
     )
-    assert result.returncode != 0
+    assert result.returncode != 0, "a MISSED row must fail the target"
+    assert "undocumented definitions remain" in result.stderr, result.stderr
