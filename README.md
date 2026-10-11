@@ -114,6 +114,10 @@ make lint
 make test
 ```
 
+`make lint` first runs `make interrogate`, which needs
+[`uv`](https://docs.astral.sh/uv/) and requires a docstring on every Python
+definition under `tests`.
+
 Building the suite requires **Rust 1.94.0 or newer** (pinned in
 `rust-toolchain.toml`). The embedded PostgreSQL worker pulls in
 `postgresql_embedded` and `sqlx`, whose 0.20 and 0.9 releases set that floor.
