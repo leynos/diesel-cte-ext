@@ -139,4 +139,6 @@ def test_dependabot_moves_the_toolchain_pin() -> None:
     group = entry["groups"]["minor-and-patch"]
     assert group["patterns"] == ["*"], group
     assert sorted(group["update-types"]) == ["minor", "patch"], group
-    assert "rust-toolchain" in entry["labels"], entry
+    assert entry["labels"] == ["dependencies", "rust-toolchain"], entry
+    assert entry["open-pull-requests-limit"] == 5, entry
+    assert entry["cooldown"] == {"default-days": 7}, entry
