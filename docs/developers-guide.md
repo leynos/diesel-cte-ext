@@ -16,6 +16,18 @@ Run `rustup toolchain install` from the repository root after changing
 behaviour stays aligned with Continuous Integration (CI). Run `make typecheck`
 to type-check every target with all features enabled.
 
+## Minimum supported Rust version
+
+`Cargo.toml` declares `rust-version = "1.86"`, the lowest toolchain on which
+the library builds with the locked dependencies (1.85 fails: a locked
+dependency needs a later compiler). The `msrv` job in the CI workflow reads
+that value from `Cargo.toml`, installs the toolchain and runs
+`cargo check --lib --locked --all-features`; it builds the library only, so the
+dev-dependencies that raise the contributor toolchain do not apply to it. Raise
+`rust-version` and its release note together when a dependency bump needs a
+newer compiler. The pin in `rust-toolchain.toml` is a separate fact, kept
+current by Dependabot's `rust-toolchain` entry.
+
 ## Spelling policy
 
 Run the spelling gate with:

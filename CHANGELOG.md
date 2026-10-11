@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Declare `rust-version = "1.86"`, the lowest Rust release that builds the
+  library with its locked dependencies. CI checks the library on that release
+  with the `msrv` job. This is the library's minimum supported Rust version and
+  is separate from the contributor toolchain pinned in `rust-toolchain.toml`.
+
 ## [0.1.2] - 2026-07-21
 
 ### Changed

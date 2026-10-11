@@ -26,6 +26,15 @@ The crate works with SQLite and PostgreSQL backends out of the box. Enable the
 | `postgres` | Enables Diesel's PostgreSQL backend integration. |
 | `async`    | Adds `diesel_async` support for both backends.   |
 
+## Minimum supported Rust version
+
+`diesel-cte-ext` declares `rust-version = "1.86"` in `Cargo.toml`: the lowest
+Rust release that builds the library with its locked dependencies. A project
+that depends on the crate needs a toolchain of at least that release. Release
+notes record any change to the floor. The repository's CI checks the library on
+that toolchain, and the contributor toolchain pinned in `rust-toolchain.toml`
+is a separate, newer release (see the developer guide).
+
 All examples in this document assume the default feature set (`sqlite` +
 `postgres`). Enable `async` when compiling the async snippets or running the
 integration tests.
