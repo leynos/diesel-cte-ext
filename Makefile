@@ -113,7 +113,7 @@ interrogate: ## Enforce complete Python docstring coverage
 	  status=$$?; \
 	  printf '%s\n' "$$report"; \
 	  test "$$status" -eq 0 || exit "$$status"; \
-	  if printf '%s\n' "$$report" | grep -q '| *MISSED |'; then \
+	  if printf '%s\n' "$$report" | grep -q '| *MISSED *|'; then \
 	    printf '%s\n' 'interrogate: undocumented definitions remain; see the MISSED rows above' >&2; \
 	    exit 1; \
 	  fi
