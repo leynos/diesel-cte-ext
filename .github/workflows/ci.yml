@@ -21,9 +21,15 @@ jobs:
       RUSTFLAGS: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Check the library on the MSRV
         run: |
-          msrv="$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)"
+          msrv="$(sed -n 's/^[[:space:]]*rust-version[[:space:]]*=[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' Cargo.toml | head -n 1)"
+          if [ -z "${msrv}" ]; then
+            echo "::error::Cargo.toml declares no rust-version, so there is no MSRV to check" >&2
+            exit 1
+          fi
           rustup toolchain install "${msrv}" --profile minimal --no-self-update
           cargo "+${msrv}" check --lib --locked --all-features
   build-test:
