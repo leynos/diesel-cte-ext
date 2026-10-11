@@ -6,6 +6,22 @@ name: CI
   workflow_dispatch:
 
 jobs:
+  # The declared MSRV is exercised by a check of the library alone, on the
+  # locked dependencies: one `cargo check`, not a second test run. The version
+  # is read from Cargo.toml, so the manifest stays the only place it is written.
+  msrv:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check the library on the MSRV
+        run: |
+          msrv="$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml)"
+          rustup toolchain install "${msrv}" --profile minimal --no-self-update
+          cargo "+${msrv}" check --lib --locked --all-features
   build-test:
     runs-on: ubuntu-latest
     permissions:

@@ -2,6 +2,7 @@
 name = "diesel-cte-ext"
 version = "0.3.0"
 edition = "2024"
+rust-version = "1.86"
 description = "Common Table Expressions for Diesel"
 readme = "README.md"
 license = "ISC"
