@@ -72,11 +72,18 @@ def test_lint_depends_on_interrogate() -> None:
     assert "interrogate" in _prerequisites("lint")
 
 
+def test_interrogate_is_declared_phony() -> None:
+    """A file named `interrogate` must not make the target look up to date."""
+    declared = re.findall(r"^\.PHONY:((?:.*\\\n)*.*)$", _makefile_text(), re.MULTILINE)
+    names = " ".join(declared).replace("\\\n", " ").split()
+    assert "interrogate" in names, "interrogate must be a .PHONY target"
+
+
 def test_the_tool_is_pinned_and_run_through_uv() -> None:
     """An unpinned tool could change the verdict with no repository change."""
     assert _variable("INTERROGATE_VERSION") == "1.7.0"
     command = _variable("INTERROGATE")
-    assert "tool run" in command
+    assert re.search(r"(\$\(UV\)|\buv) tool run\b", command), "run via uv tool run"
     assert "--from 'interrogate==$(INTERROGATE_VERSION)'" in command
 
 
