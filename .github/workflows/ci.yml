@@ -15,6 +15,10 @@ jobs:
       contents: read
     env:
       CARGO_TERM_COLOR: always
+      # An assigned RUSTFLAGS replaces `.cargo/config.toml`'s rustflags, which
+      # name the mold linker. This job does not install mold, and a check
+      # links build scripts, so it runs with the platform linker.
+      RUSTFLAGS: ""
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Check the library on the MSRV
