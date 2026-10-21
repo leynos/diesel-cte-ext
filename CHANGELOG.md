@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Stop `WithCte` reporting a static query ID. Its SQL depends on the runtime
+  CTE name and column list, so Diesel's prepared-statement cache could run the
+  statement prepared for an earlier `with_cte` query of the same type and
+  return wrong rows ([#195](https://github.com/leynos/diesel-cte-ext/issues/195)).
+
 ### Added
 
 - Declare `rust-version = "1.86"`, the lowest Rust release that builds the

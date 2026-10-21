@@ -39,20 +39,6 @@ macro_rules! impl_cte_traits {
     };
 }
 
-macro_rules! impl_static_query_id {
-    ($name:ident<$($gen:ident),*>) => {
-        impl<DB, Cols, $($gen),*> QueryId for $name<DB, Cols, $($gen),*>
-        where
-            DB: Backend + 'static,
-            Cols: 'static,
-            $($gen: 'static),*
-        {
-            type QueryId = Self;
-            const HAS_STATIC_QUERY_ID: bool = true;
-        }
-    };
-}
-
 fn push_identifiers<DB, Cols>(
     out: &mut AstPass<'_, '_, DB>,
     cols: &Columns<Cols>,
@@ -267,7 +253,22 @@ where
     }
 }
 
-impl_static_query_id!(WithCte<Cte, Body>);
+// Diesel keys its prepared-statement cache by `QueryId` when a query reports a
+// static identifier. A CTE's SQL also depends on runtime data that its type
+// does not capture (the CTE name and column list, plus the union kind for
+// recursive CTEs), so two queries of the same type can render different SQL.
+// Reporting a non-static identifier makes Diesel key the cache by the rendered
+// SQL instead, which keeps caching without reusing the wrong statement.
+impl<DB, Cols, Cte, Body> QueryId for WithCte<DB, Cols, Cte, Body>
+where
+    DB: Backend + 'static,
+    Cols: 'static,
+    Cte: 'static,
+    Body: 'static,
+{
+    type QueryId = ();
+    const HAS_STATIC_QUERY_ID: bool = false;
+}
 
 impl<DB, Cols, Seed, Step, Body> QueryId for WithRecursive<DB, Cols, Seed, Step, Body>
 where
