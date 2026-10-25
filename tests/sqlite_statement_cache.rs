@@ -2,10 +2,12 @@
 //! Regression tests for Diesel's prepared-statement cache.
 //!
 //! Diesel caches prepared statements by the query's Rust type when that type
-//! reports a static query identifier. Two CTE queries that share a Rust type but
-//! render different SQL (a different CTE name, column list, or literal fragment
-//! text) must therefore never report a static identifier; otherwise the second
-//! query silently runs the statement prepared for the first.
+//! reports a static query identifier. The table-backed query below is the real
+//! cache regression: it shares a Rust type across runtime column lists but must
+//! not report a static identifier. The raw-SQL cases use `sql::<Integer>`
+//! fragments, which Diesel intentionally marks as unsafe to cache; they only
+//! assert that the builder renders different SQL and should not be read as cache
+//! regression tests.
 
 use diesel::{
     Connection, QueryDsl, RunQueryDsl, connection::SimpleConnection, dsl::sql, sql_types::Integer,
@@ -56,6 +58,8 @@ struct CteSpec {
 }
 
 fn load_cte(conn: &mut SqliteConnection, spec: &CteSpec) -> TestResult<Vec<i32>> {
+    // Raw SQL fragments are intentionally not prepared-statement-cacheable, so
+    // they are only used here to check SQL rendering rather than cache reuse.
     let rows = conn
         .with_cte(
             spec.name,
@@ -64,6 +68,25 @@ fn load_cte(conn: &mut SqliteConnection, spec: &CteSpec) -> TestResult<Vec<i32>>
         )
         .load(conn)?;
     Ok(rows)
+}
+
+fn assert_distinct_cte_rows(
+    first: CteSpec,
+    second: CteSpec,
+    expected_first: &[i32],
+    expected_second: &[i32],
+) -> TestResult<()> {
+    let mut conn = SqliteConnection::establish(":memory:")?;
+    ensure_equal(
+        "first CTE",
+        &load_cte(&mut conn, &first)?,
+        &expected_first.to_vec(),
+    )?;
+    ensure_equal(
+        "second CTE",
+        &load_cte(&mut conn, &second)?,
+        &expected_second.to_vec(),
+    )
 }
 
 fn load_recursive(conn: &mut SqliteConnection, limit: u8) -> TestResult<Vec<i32>> {
@@ -75,7 +98,7 @@ fn load_recursive(conn: &mut SqliteConnection, limit: u8) -> TestResult<Vec<i32>
             RecursiveParts::new(
                 sql::<Integer>("SELECT 1"),
                 sql::<Integer>(&step),
-                sql::<Integer>("SELECT n FROM nums"),
+                sql::<Integer>("SELECT n FROM nums ORDER BY n"),
             ),
         )
         .load(conn)?;
@@ -124,8 +147,7 @@ fn typed_with_cte_queries_honour_their_runtime_column_lists() -> TestResult<()> 
 }
 
 #[test]
-fn with_cte_queries_with_different_fragment_text_return_their_own_rows() -> TestResult<()> {
-    let mut conn = SqliteConnection::establish(":memory:")?;
+fn with_cte_queries_with_different_fragment_text_render_their_own_sql() -> TestResult<()> {
     let first = CteSpec {
         name: "seed",
         columns: &["n"],
@@ -137,13 +159,11 @@ fn with_cte_queries_with_different_fragment_text_return_their_own_rows() -> Test
         ..first
     };
 
-    ensure_equal("first CTE", &load_cte(&mut conn, &first)?, &vec![1])?;
-    ensure_equal("second CTE", &load_cte(&mut conn, &second)?, &vec![2])
+    assert_distinct_cte_rows(first, second, &[1], &[2])
 }
 
 #[test]
-fn with_cte_queries_with_different_names_and_columns_return_their_own_rows() -> TestResult<()> {
-    let mut conn = SqliteConnection::establish(":memory:")?;
+fn with_cte_queries_with_different_names_and_columns_render_their_own_sql() -> TestResult<()> {
     let first = CteSpec {
         name: "a",
         columns: &["x"],
@@ -157,12 +177,11 @@ fn with_cte_queries_with_different_names_and_columns_return_their_own_rows() -> 
         body: "SELECT y * 100 FROM b",
     };
 
-    ensure_equal("first CTE", &load_cte(&mut conn, &first)?, &vec![10])?;
-    ensure_equal("second CTE", &load_cte(&mut conn, &second)?, &vec![200])
+    assert_distinct_cte_rows(first, second, &[10], &[200])
 }
 
 #[test]
-fn with_recursive_queries_with_different_fragment_text_return_their_own_rows() -> TestResult<()> {
+fn with_recursive_queries_with_different_fragment_text_render_their_own_sql() -> TestResult<()> {
     let mut conn = SqliteConnection::establish(":memory:")?;
     ensure_equal("count to 2", &load_recursive(&mut conn, 2)?, &vec![1, 2])?;
     ensure_equal(
