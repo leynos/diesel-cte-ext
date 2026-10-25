@@ -90,8 +90,6 @@ jobs:
         with:
           output-path: lcov.info
           format: lcov
-          features: sqlite
-          with-default-features: 'false'
           # Preserve the pre-#334 behaviour (plain `cargo test`, no
           # nextest): the embedded PostgreSQL cluster generates a fresh
           # random superuser password per run while cluster state
