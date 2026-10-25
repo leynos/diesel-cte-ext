@@ -243,6 +243,12 @@ where
     Body: QueryFragment<DB>,
 {
     fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, DB>) -> QueryResult<()> {
+        // `WithCte` can render SQL identical to another query while carrying
+        // different bind SQL types in its fragments. Diesel's dynamic
+        // statement-cache key for such queries is SQL text only, so caching can
+        // reuse a prepared statement with mismatched parameter types.
+        out.unsafe_to_cache_prepared();
+
         out.push_sql("WITH ");
         out.push_identifier(self.cte_name)?;
         push_identifiers(&mut out, &self.columns)?;
@@ -254,11 +260,13 @@ where
 }
 
 // Diesel keys its prepared-statement cache by `QueryId` when a query reports a
-// static identifier. A CTE's SQL also depends on runtime data that its type
-// does not capture (the CTE name and column list, plus the union kind for
-// recursive CTEs), so two queries of the same type can render different SQL.
-// Reporting a non-static identifier makes Diesel key the cache by the rendered
-// SQL instead, which keeps caching without reusing the wrong statement.
+// static identifier. CTE SQL depends on runtime data that its type does not
+// capture (the CTE name and column list, plus the union kind for recursive
+// CTEs), so both CTE builders report a non-static identifier.
+//
+// For `WithCte`, SQL text alone is not enough to cache safely because distinct
+// queries can render the same SQL while binding different SQL types. Its
+// `walk_ast` therefore opts out of prepared-statement caching.
 impl<DB, Cols, Cte, Body> QueryId for WithCte<DB, Cols, Cte, Body>
 where
     DB: Backend + 'static,
