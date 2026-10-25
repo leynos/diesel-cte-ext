@@ -1,5 +1,5 @@
-#![cfg(feature = "postgres")]
 //! Property tests for recursive CTE search clause rendering on `PostgreSQL`.
+#![cfg(feature = "postgres")]
 
 use diesel::{debug_query, dsl::sql, expression::SqlLiteral, pg::Pg, sql_types::Integer};
 use diesel_cte_ext::{RecursiveParts, SearchStyle, builders};
