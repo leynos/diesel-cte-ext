@@ -51,6 +51,7 @@ mod schema {
 use schema::{pairs, people};
 
 /// A CTE built from literal SQL fragments.
+#[derive(Debug, Clone, Copy)]
 struct CteSpec {
     name: &'static str,
     columns: &'static [&'static str],
@@ -123,6 +124,8 @@ fn assert_distinct_cte_rows(
 }
 
 fn load_recursive(conn: &mut SqliteConnection, limit: u8) -> TestResult<Vec<i32>> {
+    // Raw SQL fragments are intentionally not prepared-statement-cacheable, so
+    // this is only used here to check SQL rendering rather than cache reuse.
     let step = format!("SELECT n + 1 FROM nums WHERE n < {limit}");
     let rows = conn
         .with_recursive(
