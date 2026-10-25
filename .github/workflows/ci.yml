@@ -72,6 +72,11 @@ jobs:
         run: make test-workflow-contracts
       - name: Test pg_worker preparation
         run: make test-prepare-pg-worker
+      - name: Install tzdata for embedded PostgreSQL
+        if: github.event_name == 'pull_request'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes tzdata
       # Pull requests only: main's push is measured by coverage-main.yml, the
       # one workflow that writes the ratchet baseline. The lane publishes no
       # artefact and never contacts CodeScene.
@@ -79,6 +84,7 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           RUSTFLAGS: -D warnings
+          TZDIR: /usr/share/zoneinfo
           GITHUB_TOKEN: ${{ github.token }}
         uses: leynos/shared-actions/.github/actions/generate-coverage@e693d81d176d2305e2b736a0be0f9038085dec7f
         with:
