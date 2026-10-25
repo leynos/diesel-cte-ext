@@ -30,8 +30,9 @@ where
     }
 }
 
-/// Schemas for the typed-fragment regression test.
 mod schema {
+    //! Table definitions used by the typed-fragment cache regression tests.
+
     diesel::table! {
         people (id) {
             id -> Integer,
