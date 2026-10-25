@@ -110,9 +110,7 @@ mod tests {
 
     use super::*;
     use crate::{SearchStyle, builders::RecursiveParts, test_support::normalise_debug_sql};
-    use diesel::{
-        debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer,
-    };
+    use diesel::{debug_query, dsl::sql, expression::SqlLiteral, sql_types::Integer};
     use rstest::{fixture, rstest};
     use std::marker::PhantomData;
 
