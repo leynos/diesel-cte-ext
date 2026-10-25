@@ -14,6 +14,7 @@ use diesel::{
     sqlite::SqliteConnection,
 };
 use diesel_cte_ext::{CteParts, RecursiveCTEExt, RecursiveParts};
+use rstest::rstest;
 use std::error::Error;
 
 type TestResult<T> = Result<T, Box<dyn Error>>;
@@ -55,6 +56,38 @@ struct CteSpec {
     columns: &'static [&'static str],
     cte: &'static str,
     body: &'static str,
+}
+
+type CteCase = (CteSpec, CteSpec, Vec<i32>, Vec<i32>);
+
+fn cte_fragment_text_case() -> CteCase {
+    let first = CteSpec {
+        name: "seed",
+        columns: &["n"],
+        cte: "SELECT 1",
+        body: "SELECT n FROM seed",
+    };
+    let second = CteSpec {
+        cte: "SELECT 2",
+        ..first
+    };
+    (first, second, vec![1], vec![2])
+}
+
+fn cte_name_and_column_case() -> CteCase {
+    let first = CteSpec {
+        name: "a",
+        columns: &["x"],
+        cte: "SELECT 1",
+        body: "SELECT x * 10 FROM a",
+    };
+    let second = CteSpec {
+        name: "b",
+        columns: &["y"],
+        cte: "SELECT 2",
+        body: "SELECT y * 100 FROM b",
+    };
+    (first, second, vec![10], vec![200])
 }
 
 fn load_cte(conn: &mut SqliteConnection, spec: &CteSpec) -> TestResult<Vec<i32>> {
@@ -146,38 +179,12 @@ fn typed_with_cte_queries_honour_their_runtime_column_lists() -> TestResult<()> 
     )
 }
 
-#[test]
-fn with_cte_queries_with_different_fragment_text_render_their_own_sql() -> TestResult<()> {
-    let first = CteSpec {
-        name: "seed",
-        columns: &["n"],
-        cte: "SELECT 1",
-        body: "SELECT n FROM seed",
-    };
-    let second = CteSpec {
-        cte: "SELECT 2",
-        ..first
-    };
-
-    assert_distinct_cte_rows(first, second, &[1], &[2])
-}
-
-#[test]
-fn with_cte_queries_with_different_names_and_columns_render_their_own_sql() -> TestResult<()> {
-    let first = CteSpec {
-        name: "a",
-        columns: &["x"],
-        cte: "SELECT 1",
-        body: "SELECT x * 10 FROM a",
-    };
-    let second = CteSpec {
-        name: "b",
-        columns: &["y"],
-        cte: "SELECT 2",
-        body: "SELECT y * 100 FROM b",
-    };
-
-    assert_distinct_cte_rows(first, second, &[10], &[200])
+#[rstest]
+#[case::different_fragment_text(cte_fragment_text_case())]
+#[case::different_names_and_columns(cte_name_and_column_case())]
+fn with_cte_queries_render_their_own_sql(#[case] case: CteCase) -> TestResult<()> {
+    let (first, second, expected_first, expected_second) = case;
+    assert_distinct_cte_rows(first, second, &expected_first, &expected_second)
 }
 
 #[test]
