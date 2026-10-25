@@ -72,6 +72,8 @@ jobs:
         with:
           output-path: lcov.info
           format: lcov
+          features: sqlite
+          with-default-features: 'false'
           # See ci.yml: preserve plain `cargo test` to avoid the
           # embedded PostgreSQL random-password rerun trap.
           use-cargo-nextest: 'false'
