@@ -96,7 +96,7 @@ fn with_recursive_skips_identifier_list_when_empty() {
 }
 
 #[test]
-fn query_id_reflects_runtime_union_choice() {
+fn query_ids_are_not_static_because_sql_depends_on_runtime_data() {
     type RecursiveQuery =
         WithRecursive<Sqlite, (), SqlLiteral<Integer>, SqlLiteral<Integer>, SqlLiteral<Integer>>;
     type CteQuery = WithCte<Sqlite, (), SqlLiteral<Integer>, SqlLiteral<Integer>>;
@@ -106,5 +106,5 @@ fn query_id_reflects_runtime_union_choice() {
     let cte_has_static = std::hint::black_box(<CteQuery as QueryId>::HAS_STATIC_QUERY_ID);
 
     assert!(!recursive_has_static);
-    assert!(cte_has_static);
+    assert!(!cte_has_static);
 }

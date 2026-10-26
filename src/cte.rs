@@ -39,20 +39,6 @@ macro_rules! impl_cte_traits {
     };
 }
 
-macro_rules! impl_static_query_id {
-    ($name:ident<$($gen:ident),*>) => {
-        impl<DB, Cols, $($gen),*> QueryId for $name<DB, Cols, $($gen),*>
-        where
-            DB: Backend + 'static,
-            Cols: 'static,
-            $($gen: 'static),*
-        {
-            type QueryId = Self;
-            const HAS_STATIC_QUERY_ID: bool = true;
-        }
-    };
-}
-
 fn push_identifiers<DB, Cols>(
     out: &mut AstPass<'_, '_, DB>,
     cols: &Columns<Cols>,
@@ -257,6 +243,12 @@ where
     Body: QueryFragment<DB>,
 {
     fn walk_ast<'b>(&'b self, mut out: AstPass<'_, 'b, DB>) -> QueryResult<()> {
+        // `WithCte` can render SQL identical to another query while carrying
+        // different bind SQL types in its fragments. Diesel's dynamic
+        // statement-cache key for such queries is SQL text only, so caching can
+        // reuse a prepared statement with mismatched parameter types.
+        out.unsafe_to_cache_prepared();
+
         out.push_sql("WITH ");
         out.push_identifier(self.cte_name)?;
         push_identifiers(&mut out, &self.columns)?;
@@ -267,7 +259,24 @@ where
     }
 }
 
-impl_static_query_id!(WithCte<Cte, Body>);
+// Diesel keys its prepared-statement cache by `QueryId` when a query reports a
+// static identifier. CTE SQL depends on runtime data that its type does not
+// capture (the CTE name and column list, plus the union kind for recursive
+// CTEs), so both CTE builders report a non-static identifier.
+//
+// For `WithCte`, SQL text alone is not enough to cache safely because distinct
+// queries can render the same SQL while binding different SQL types. Its
+// `walk_ast` therefore opts out of prepared-statement caching.
+impl<DB, Cols, Cte, Body> QueryId for WithCte<DB, Cols, Cte, Body>
+where
+    DB: Backend + 'static,
+    Cols: 'static,
+    Cte: 'static,
+    Body: 'static,
+{
+    type QueryId = ();
+    const HAS_STATIC_QUERY_ID: bool = false;
+}
 
 impl<DB, Cols, Seed, Step, Body> QueryId for WithRecursive<DB, Cols, Seed, Step, Body>
 where

@@ -1,5 +1,5 @@
-#![cfg(feature = "postgres")]
 //! Behavioural tests for recursive CTE helpers on `PostgreSQL`.
+#![cfg(all(feature = "postgres", not(coverage)))]
 
 use diesel::RunQueryDsl as DieselRunQueryDsl;
 use diesel::{
