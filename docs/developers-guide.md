@@ -2,16 +2,18 @@
 
 ## Contributor toolchain
 
-The pinned Rust toolchain is **1.94.0** and includes `rustfmt`, `clippy`, and
-`rust-analyzer`. The 1.94.0 pin was set when the `pg-embed-setup-unpriv` 0.5.2
-test dependency required that release through its transitive crates. With 0.6.3
-locked, the highest `rust-version` any locked package declares is 1.92
-(`postgresql_embedded`, `postgresql_commands`, `postgresql_archive` and
-`pg-embed-setup-unpriv` itself), read from `cargo metadata --locked`, so the
-dependency tree no longer requires 1.94.0. The pin stays at 1.94.0 because
-lowering the repository's toolchain is a separate decision that this dependency
-bump does not make; the declared floors were not verified by a build on 1.92.
-Run `rustup toolchain install` from the repository root after changing
+The pinned Rust toolchain is **1.99.1** and includes `rustfmt`, `clippy`, and
+`rust-analyzer`. The pin moved from 1.94.0 to 1.99.1 on 2026-10-31 with
+Dependabot's toolchain bump, carried here with the snapshot refresh the newer
+compiler needed. The earlier 1.94.0 pin was set when the
+`pg-embed-setup-unpriv` 0.5.2 test dependency required that release through its
+transitive crates. With 0.6.3 locked, the highest `rust-version` any locked
+package declares is 1.92 (`postgresql_embedded`, `postgresql_commands`,
+`postgresql_archive` and `pg-embed-setup-unpriv` itself), read from
+`cargo metadata --locked`, so the dependency tree no longer requires 1.94.0.
+Lowering the repository's toolchain is a separate decision that the dependency
+bump did not make; the declared floors were not verified by a build on 1.92. Run
+`rustup toolchain install` from the repository root after changing
 `rust-toolchain.toml` so local language-server, formatting, and linting
 behaviour stays aligned with Continuous Integration (CI). Run `make typecheck`
 to type-check every target with all features enabled.
@@ -332,7 +334,7 @@ For usage details, see
 ## The build standard
 
 Development, test, lint, and typecheck builds use the `mold` linker on Linux;
-the parallel frontend flag is nightly-only, and the pinned `1.94.0` is stable,
+the parallel frontend flag is nightly-only, and the pinned `1.99.1` is stable,
 so it is not used. These are defaults in `.cargo/config.toml`, which Cargo
 discovers on its own, so a bare `cargo build` gets them. `mold` ships for Linux
 only, so the linker flag lives in a Linux-only table and macOS and Windows keep
@@ -359,8 +361,28 @@ the `setup-rust` steps of the CI workflows (each must pass `install-mold`), so
 a flag lost through a recipe or workflow edit fails there. The decision is
 recorded in [ADR 001](adr-001-rust-build-standard.md).
 
+### Development build footprint
+
+The development profile sets `incremental = false` and `debug = 0` in the root
+`Cargo.toml`, so a dev build keeps no incremental state or debug information.
+To debug, set `CARGO_PROFILE_DEV_DEBUG=true`; to rebuild incrementally, set
+`CARGO_INCREMENTAL=1` (unset any `sccache` wrapper first, which refuses
+incremental builds). The pin is stable, so the native Cargo metadata key
+(`[unstable] embed-metadata`) does not apply and the configuration must not
+carry it. `tests/workflow_contracts/build_footprint_test.py` holds the settings
+and proves them, with both overrides, at the Cargo boundary.
+
+### Whitaker isolation
+
+`make lint` runs Whitaker with the literal `RUSTFLAGS="-D warnings"`. Whitaker
+runs under the toolchain its installer manages, so it takes none of the
+development standard (no `mold` linker flag and no inherited `RUSTFLAGS`).
+`tests/workflow_contracts/whitaker_isolation_test.py` holds that boundary.
+
 ### Cranelift
 
 Exception: Cranelift is not the development-profile backend, because Cranelift
-requires a nightly toolchain and this repository pins the stable `1.94.0`
-(recorded 2026-09-29). Revisit if the repository moves to a nightly pin.
+requires a nightly toolchain and this repository pins the stable `1.99.1`
+(recorded 2026-09-29 on `1.94.0`; the reason, a stable pin, has not changed,
+and no measurement was taken on `1.99.1`). Revisit if the repository moves to a
+nightly pin.

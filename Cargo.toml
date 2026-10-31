@@ -107,3 +107,10 @@ pg-embed-setup-unpriv = { version = "0.6.3", features = ["diesel-support"] }
 proptest = "1"
 trybuild = "1"
 mutants = "0.0.4"
+
+# Development builds keep neither incremental state nor debug information (rule
+# `rust-dev-build-footprint`, DF-001 and DF-002). Set CARGO_PROFILE_DEV_DEBUG=true
+# to debug, or CARGO_INCREMENTAL=1 to rebuild incrementally.
+[profile.dev]
+incremental = false
+debug = 0
