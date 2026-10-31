@@ -56,7 +56,7 @@ def _whitaker_command() -> str:
 def test_the_whitaker_recipe_sets_a_literal_warning_only_rustflags() -> None:
     """The command assigns ``RUSTFLAGS="-D warnings"`` and nothing else."""
     command = _whitaker_command()
-    assert re.match(r'^RUSTFLAGS="-D warnings" whitaker --all ', command), (
+    assert re.match(r'^RUSTFLAGS="-D warnings" (?:\S+/)?whitaker --all ', command), (
         f"Whitaker must run under a literal RUSTFLAGS boundary: {command}"
     )
 
