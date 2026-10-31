@@ -6,15 +6,7 @@ error[E0277]: the trait bound `(oversized::columns::c01, oversized::columns::c02
    |
    = help: the trait `ColumnNames` is not implemented for `(oversized::columns::c01, oversized::columns::c02, oversized::columns::c03, oversized::columns::c04, oversized::columns::c05, oversized::columns::c06, oversized::columns::c07, oversized::columns::c08, oversized::columns::c09, oversized::columns::c10, oversized::columns::c11, oversized::columns::c12, oversized::columns::c13, oversized::columns::c14, oversized::columns::c15, oversized::columns::c16, oversized::columns::c17)`
    = help: the following other types implement trait `ColumnNames`:
-             (A, B)
-             (A, B, C)
-             (A, B, C, D)
-             (A, B, C, D, E)
-             (A, B, C, D, E, F)
-             (A, B, C, D, E, F, G)
-             (A, B, C, D, E, F, G, H)
-             (A, B, C, D, E, F, G, H, I)
-           and $N others
+             (T₁, T₂, …, Tₙ) for tuples of arity 1 up to and including 16
 note: required by a bound in `Columns::<()>::for_table`
   --> src/columns.rs
    |

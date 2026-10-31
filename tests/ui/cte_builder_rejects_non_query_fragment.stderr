@@ -14,14 +14,14 @@ error[E0277]: `String` is no valid SQL fragment for the `Sqlite` backend
    = note: this usually means that the `Sqlite` database system does not support
            this SQL syntax
    = help: the following other types implement trait `QueryFragment<DB, SP>`:
-             `&T` implements `QueryFragment<DB>`
-             `()` implements `QueryFragment<DB>`
-             `(T, T1)` implements `QueryFragment<__DB>`
-             `(T, T1, T2)` implements `QueryFragment<__DB>`
-             `(T, T1, T2, T3)` implements `QueryFragment<__DB>`
-             `(T, T1, T2, T3, T4)` implements `QueryFragment<__DB>`
-             `(T, T1, T2, T3, T4, T5)` implements `QueryFragment<__DB>`
-             `(T, T1, T2, T3, T4, T5, T6)` implements `QueryFragment<__DB>`
+             BoxedLimitOffsetClause<'_, Sqlite>
+             InsertOrIgnore
+             LimitOffsetClause<LimitClause<L>, NoOffsetClause>
+             LimitOffsetClause<LimitClause<L>, OffsetClause<O>>
+             LimitOffsetClause<NoLimitClause, NoOffsetClause>
+             LimitOffsetClause<NoLimitClause, OffsetClause<O>>
+             ParenthesisWrapper<T>
+             Replace
            and $N others
 note: required by a bound in `diesel_cte_ext::RecursiveCTEExt::with_recursive`
   --> src/connection_ext.rs
