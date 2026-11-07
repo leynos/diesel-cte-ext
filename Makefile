@@ -70,6 +70,7 @@ clean: ## Remove build artifacts
 	$(CARGO) clean
 
 test: prepare-pg-worker ## Run tests with warnings treated as errors
+	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 	mkdir -p "$(PG_EMBED_BASE)"
 	chmod 1777 "$(PG_EMBED_BASE)"
 	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
