@@ -130,6 +130,7 @@ run_make() {
     PG_WORKER_TEST_JQ_FAIL="${PG_WORKER_TEST_JQ_FAIL:-}" \
     PG_WORKER_TEST_FAIL_BUILD="${PG_WORKER_TEST_FAIL_BUILD:-}" \
     PG_WORKER_TEST_FAIL_FETCH="${PG_WORKER_TEST_FAIL_FETCH:-}" \
+    CARGO_BUILD_TARGET="${PG_WORKER_TEST_BUILD_TARGET:-}" \
     make -f "$repo_root/Makefile" CURDIR="$workspace" "$@"
 }
 
@@ -249,7 +250,14 @@ assert_fetch_runs_first_and_a_failed_fetch_stops_before_anything_builds() {
   : > "$log_file"
   mkdir -p "$(dirname "$output_path")"
   run_make PG_WORKER_PATH="$output_path" prepare-pg-worker >/dev/null
+  # An unset or empty CARGO_BUILD_TARGET fetches for the host; a set one for it.
   test "$(head -n 1 "$log_file")" = 'cargo fetch --locked --target host-tuple'
+
+  : > "$log_file"
+  PG_WORKER_TEST_BUILD_TARGET=aarch64-unknown-linux-gnu \
+    run_make PG_WORKER_PATH="$output_path" prepare-pg-worker >/dev/null
+  test "$(head -n 1 "$log_file")" = \
+    'cargo fetch --locked --target aarch64-unknown-linux-gnu'
 
   : > "$log_file"
   if PG_WORKER_TEST_FAIL_FETCH=1 run_make PG_WORKER_PATH="$output_path" prepare-pg-worker >/dev/null 2>&1; then
