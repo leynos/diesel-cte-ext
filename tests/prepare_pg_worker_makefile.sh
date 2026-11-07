@@ -21,6 +21,12 @@ set -euo pipefail
 printf 'cargo %s\n' "$*" >> "$PG_WORKER_TEST_LOG"
 
 case "$1" in
+  fetch)
+    if [ "${PG_WORKER_TEST_FAIL_FETCH:-}" = "1" ]; then
+      printf 'forced fetch failure\n' >&2
+      exit 67
+    fi
+    ;;
   metadata)
     printf '{"packages":[{"name":"pg-embed-setup-unpriv","manifest_path":"%s"}]}\n' \
       "$PG_WORKER_TEST_MANIFEST"
@@ -123,6 +129,7 @@ run_make() {
     PG_WORKER_TEST_EMPTY_MANIFEST="${PG_WORKER_TEST_EMPTY_MANIFEST:-}" \
     PG_WORKER_TEST_JQ_FAIL="${PG_WORKER_TEST_JQ_FAIL:-}" \
     PG_WORKER_TEST_FAIL_BUILD="${PG_WORKER_TEST_FAIL_BUILD:-}" \
+    PG_WORKER_TEST_FAIL_FETCH="${PG_WORKER_TEST_FAIL_FETCH:-}" \
     make -f "$repo_root/Makefile" CURDIR="$workspace" "$@"
 }
 
@@ -236,7 +243,26 @@ assert_failed_build_stops_before_install() {
   test ! -e "$output_path"
 }
 
+assert_fetch_runs_first_and_a_failed_fetch_stops_before_anything_builds() {
+  local output_path="$scratch/output/failed-fetch/pg_worker"
+
+  : > "$log_file"
+  mkdir -p "$(dirname "$output_path")"
+  run_make PG_WORKER_PATH="$output_path" prepare-pg-worker >/dev/null
+  test "$(head -n 1 "$log_file")" = 'cargo fetch --locked --target host-tuple'
+
+  : > "$log_file"
+  if PG_WORKER_TEST_FAIL_FETCH=1 run_make PG_WORKER_PATH="$output_path" prepare-pg-worker >/dev/null 2>&1; then
+    printf 'expected prepare-pg-worker to fail when cargo fetch fails\n' >&2
+    exit 1
+  fi
+  assert_log_contains 'cargo fetch --locked'
+  assert_log_excludes 'cargo metadata'
+  assert_log_excludes 'cargo build'
+}
+
 assert_default_profile_installs_from_debug
+assert_fetch_runs_first_and_a_failed_fetch_stops_before_anything_builds
 assert_profile_installs_from release release
 assert_profile_installs_from test debug
 assert_profile_installs_from bench release
