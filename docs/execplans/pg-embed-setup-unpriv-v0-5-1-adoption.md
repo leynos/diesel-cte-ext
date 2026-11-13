@@ -454,7 +454,7 @@ Create `docs/adr/` if it does not exist. Number the ADR sequentially. If there
 are still no ADR files, use:
 
 ```plaintext
-docs/adr/0001-adopt-shared-pg-embed-test-cluster.md
+docs/adrs/adr-0001-adopt-shared-pg-embed-test-cluster.md
 ```
 
 The ADR must use the Y-Statement format from the `arch-decision-records` skill.

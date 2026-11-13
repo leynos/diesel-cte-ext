@@ -287,7 +287,7 @@ cluster avoids repeated PostgreSQL bootstrap work, while each
 `TemporaryDatabase` keeps mutable database state isolated between tests.
 
 The fixture architecture is recorded in
-[`docs/adr/0001-adopt-shared-pg-embed-test-cluster.md`](adr/0001-adopt-shared-pg-embed-test-cluster.md).
+[`docs/adrs/adr-0001-adopt-shared-pg-embed-test-cluster.md`](adrs/adr-0001-adopt-shared-pg-embed-test-cluster.md).
 
 Use `make test` for the supported local test workflow. The target uses `jq` to
 locate the locked `pg-embed-setup-unpriv` dependency manifest, builds its
@@ -372,7 +372,7 @@ development target on a Linux host and a macOS host (each keeping the caller's
 own `RUSTFLAGS`) and for each coverage and release target on a Linux host, and
 the `setup-rust` steps of the CI workflows (each must pass `install-mold`), so
 a flag lost through a recipe or workflow edit fails there. The decision is
-recorded in [ADR 001](adr-001-rust-build-standard.md).
+recorded in [ADR 001](adrs/adr-0001-rust-build-standard.md).
 
 ### Development build footprint
 
