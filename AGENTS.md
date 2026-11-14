@@ -66,8 +66,8 @@
   indexes when names or locations change. Keep transient validation results in
   the PR or execution record.
 - **Decision history:** Preserve accepted ADR decisions; record subsequent
-  changes through the
-  [ADR amendment and supersession process](docs/documentation-style-guide.md#architectural-decision-records-adrs).
+  changes as amendments or supersessions, following the
+  [ADR rules in the documentation style guide](docs/documentation-style-guide.md#architectural-decision-records-adrs).
   Capture proof-driven API, representation, and invariant decisions in the
   design documentation.
 - **Completed execplans:** Completed execplans are historical documents and
@@ -232,8 +232,9 @@ project:
 
     building the documentation, linting every target with all features enabled
     and denying all Clippy warnings, and then running the Whitaker Dylint suite.
-    Whitaker runs under the toolchain its installer manages, so it does not
-    receive the `mold` linker flag used by the other commands.
+    Whitaker runs under the toolchain its installer manages. Its `RUSTFLAGS` is
+    set literally to `-D warnings`, so it receives neither the `mold` linker flag
+    nor any inherited `RUSTFLAGS`.
   - `make test` first runs `make prepare-pg-worker`, which builds the locked
     `pg_worker` helper used by the PostgreSQL tests, and then executes:
 
@@ -241,8 +242,9 @@ project:
     cargo test --all-targets --all-features
     ```
 
-    with `RUSTFLAGS` set to `-D warnings` (plus the `mold` linker on Linux) and
-    the `PG_EMBEDDED_WORKER`, `PG_RUNTIME_DIR`, and `PG_DATA_DIR` variables set.
+    with `RUSTFLAGS` composed from any inherited value, `-D warnings`, and (on
+    Linux) the `mold` linker flag, and with the `PG_EMBEDDED_WORKER`,
+    `PG_RUNTIME_DIR`, and `PG_DATA_DIR` variables set.
     Use `make fmt` (`cargo fmt --all`, then `mdtablefix` and `markdownlint-cli2
     --fix` on Markdown files) to apply formatting fixes reported by the
     formatter check.
