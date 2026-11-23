@@ -1,4 +1,6 @@
-# Architectural decision record (ADR) 001: Adopt the Rust build standard for development builds
+# Architectural decision record (ADR) 0003: Adopt the Rust build standard for development builds
+
+Renumbered from 0001 on 2026-11-23 (duplicate number).
 
 ## Status
 
