@@ -372,7 +372,7 @@ development target on a Linux host and a macOS host (each keeping the caller's
 own `RUSTFLAGS`) and for each coverage and release target on a Linux host, and
 the `setup-rust` steps of the CI workflows (each must pass `install-mold`), so
 a flag lost through a recipe or workflow edit fails there. The decision is
-recorded in [ADR 001](adrs/adr-0001-rust-build-standard.md).
+recorded in [ADR 0003](adrs/adr-0003-rust-build-standard.md).
 
 ### Development build footprint
 

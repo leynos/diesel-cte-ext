@@ -1,4 +1,6 @@
-# ADR 0001: Record the recursive search order API
+# ADR 0002: Record the recursive search order API
+
+Renumbered from 0001 on 2026-11-23 (duplicate number).
 
 - Status: Accepted
 - Date: 2026-06-25
