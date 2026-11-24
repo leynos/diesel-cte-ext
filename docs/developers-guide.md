@@ -385,6 +385,16 @@ incremental builds). The pin is stable, so the native Cargo metadata key
 carry it. `tests/workflow_contracts/build_footprint_test.py` holds the settings
 and proves them, with both overrides, at the Cargo boundary.
 
+### Cognitive complexity
+
+Cognitive complexity is not gated by Clippy. Clippy's `cognitive_complexity`
+scores code after macro expansion, so it counts branching a macro generated,
+and neither `Cargo.toml` nor `clippy.toml` enables it. Whitaker's experimental
+`macro_aware_cognitive_complexity` gates it at `max_complexity = 9`,
+CodeScene's ceiling. `dylint.toml` opts in with
+`[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a finding
+by extracting named helpers, never by raising the threshold.
+
 ### Whitaker isolation
 
 `make lint` runs Whitaker with the literal `RUSTFLAGS="-D warnings"`. Whitaker
