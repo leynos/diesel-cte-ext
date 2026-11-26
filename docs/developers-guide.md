@@ -295,6 +295,15 @@ locate the locked `pg-embed-setup-unpriv` dependency manifest, builds its
 then runs `cargo test --all-targets --all-features`. This keeps root-agent runs
 aligned with CI and avoids hidden worker builds inside Rust test code.
 
+Before that run, `make test` pays for the trybuild tests' nested builds outside
+the timed run: it builds the test binaries with `cargo test --no-run`, then
+runs the `trybuild` test binary once, because a plain `--no-run` leaves
+trybuild's own build tree (`target/tests/trybuild`) empty. Both commands use
+`WARM_FLAGS`, which is `CARGO_FLAGS` without `--all-targets`. `CARGO_FLAGS`
+holds the build shape (features, profile, target); `TEST_FLAGS` only selects
+tests (a name, `--`) and never reaches the warm-up, so a selection cannot fail
+it or select nothing.
+
 `prepare-pg-worker` derives the worker install source from `PG_WORKER_PROFILE`
 so the copied binary follows Cargo's built-in output directories:
 

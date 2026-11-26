@@ -11,6 +11,12 @@ RUST_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
+# What the nested-build warm-up builds with: CARGO_FLAGS, the build shape every
+# cargo gate here shares (features, profile, target), without `--all-targets`,
+# which would select every test target. Build options belong in CARGO_FLAGS.
+# TEST_FLAGS only selects tests (a name, `--`), and a selection must not reach
+# the warm-up: it would fail it or select nothing.
+WARM_FLAGS ?= $(filter-out --all-targets,$(CARGO_FLAGS))
 MDLINT ?= markdownlint-cli2
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
 # Markdown files Git tracks and `--include-untracked` adds the untracked files
@@ -75,6 +81,11 @@ fetch-locked: ## Fetch the locked dependencies once, before anything builds
 test: prepare-pg-worker ## Run tests with warnings treated as errors
 	mkdir -p "$(PG_EMBED_BASE)"
 	chmod 1777 "$(PG_EMBED_BASE)"
+	# Pay for the nested builds before the timed run: build the test binaries
+	# under the run's own flags, then run the trybuild binary once, because a plain
+	# `--no-run` leaves trybuild's own build tree (<target>/tests/trybuild) empty.
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --no-run --all-targets $(WARM_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --test trybuild $(WARM_FLAGS) $(BUILD_JOBS)
 	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
 
 prepare-pg-worker: fetch-locked ## Build the locked pg_worker helper used by PostgreSQL tests
