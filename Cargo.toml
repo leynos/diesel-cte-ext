@@ -16,7 +16,7 @@ resolver = "2"
 
 [dependencies]
 diesel = { version = "2", default-features = false }
-diesel-async = { version = "0.9", default-features = false, optional = true, features = ["postgres", "sqlite", "tokio", "async-connection-wrapper"] }
+diesel-async = { version = "0.10", default-features = false, optional = true, features = ["postgres", "sqlite", "tokio", "async-connection-wrapper"] }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -99,7 +99,7 @@ diesel = { version = "2", default-features = false, features = [
     "chrono",
     "32-column-tables",
 ] }
-diesel-async = { version = "0.9", features = ["sqlite", "postgres", "tokio", "async-connection-wrapper"] }
+diesel-async = { version = "0.10", features = ["sqlite", "postgres", "tokio", "async-connection-wrapper"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 rstest = "0.28.0"
 pg-embed-setup-unpriv = { version = "0.6.3", features = ["diesel-support"] }
