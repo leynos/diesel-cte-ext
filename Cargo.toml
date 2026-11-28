@@ -88,8 +88,8 @@ missing_crate_level_docs            = "deny"
 
 [features]
 default = ["sqlite", "postgres"]
-sqlite = ["diesel/sqlite", "diesel-async/sqlite"]
-postgres = ["diesel/postgres", "diesel-async/postgres"]
+sqlite = ["diesel/sqlite"]
+postgres = ["diesel/postgres"]
 async = ["dep:diesel-async"]
 
 [dev-dependencies]

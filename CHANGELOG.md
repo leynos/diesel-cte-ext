@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Stop the `sqlite` and `postgres` features enabling `diesel-async`. The
+  `async` feature already enables it, with the `sqlite` and `postgres` features
+  it needs, so async builds are unchanged. Applications that use only the
+  synchronous helpers no longer compile `diesel-async`, and no longer have it
+  constrain Diesel to the 2.3 series, so they can use Diesel 2.4.
+
 ### Fixed
 
 - Stop `WithCte` reporting a static query ID. Its SQL depends on the runtime
