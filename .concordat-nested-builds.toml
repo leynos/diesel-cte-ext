@@ -1,0 +1,4 @@
+[[builder]]
+path = "tests/trybuild.rs"
+subject = "compiler-diagnostics"
+covered_by = "make:prepare-nested-builds"
