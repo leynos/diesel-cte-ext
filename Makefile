@@ -89,7 +89,7 @@ clean: ## Remove build artifacts
 fetch-locked: ## Fetch the locked dependencies once, before anything builds
 	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 
-prepare-nested-builds: ## Pay for trybuild's nested builds before the timed run
+prepare-nested-builds: fetch-locked ## Pay for trybuild's nested builds before the timed run
 	# Build the test binaries under the run's own flags, then run the trybuild
 	# binary once, because a plain `--no-run` leaves trybuild's own build tree
 	# (<target>/tests/trybuild) empty.
