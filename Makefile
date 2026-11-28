@@ -28,19 +28,30 @@ MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 NIXIE ?= nixie
 WHITAKER ?= whitaker
-UV ?= uv
-UV_ENV = UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools
+# Every uv call but the spelling builder's goes through the vendored helper,
+# which cleans the environment, uses the global uv cache, runs offline first and
+# goes online at most once. The builder runs directly at its release tag,
+# because the spelling baseline requires that form and the helper accepts only
+# a full commit. See
+# https://github.com/leynos/shared-actions/tree/main/uv_gate for the contract.
+# `scripts/uv_gate.py` is the shared-actions helper, vendored byte for byte, so
+# update it by copying the canonical file, never by editing it here. The helper
+# finds uv on PATH (outside ~/.lody, which it removes), so there is no UV
+# override: put the uv you want first. It needs python3 3.9 or newer. A uv
+# that reports only `Git operation failed` for a Git source missing from the
+# cache is not retried online: warm the cache once with `uv tool run`.
+UV_GATE ?= python3 scripts/uv_gate.py
 
 # The CV-005 CodeScene contracts live in shared-actions and run from a full
 # commit, so a fix is a pin bump. `.github/cv005.toml` holds this repository's
 # only parameters.
 CV005_CONTRACTS_REF ?= 88977798a5c3bae1549afb99642529488c665276
-CV005_CONTRACTS = $(UV_ENV) $(UV) tool run --python 3.13 \
+CV005_CONTRACTS = $(UV_GATE) tool --python 3.13 \
 	--from 'git+https://github.com/leynos/shared-actions@$(CV005_CONTRACTS_REF)\#subdirectory=packages/cv005-contracts' \
-	cv005-contracts
+	-- cv005-contracts
 
 TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
-TYPOS_CONFIG_BUILDER = $(UV_ENV) $(UV) tool run --python 3.14 --from \
+TYPOS_CONFIG_BUILDER = uv tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
 PG_WORKER_PATH ?= $(CURDIR)/target/pg_worker
@@ -104,7 +115,7 @@ test-prepare-pg-worker: ## Test pg_worker profile mapping and fail-fast setup
 
 test-workflow-contracts: ## Validate the mutation-testing and CodeScene coverage workflow contracts
 	$(CV005_CONTRACTS) check --repository .
-	uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q
+	$(UV_GATE) tool --python 3.13 --from 'pytest==9.2.0' --with 'pyyaml==6.0.3' -- pytest tests/workflow_contracts -q
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release)
@@ -113,12 +124,12 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 # owns. Add a new Python directory to INTERROGATE_TARGETS. No `--python` pin: a
 # managed interpreter would be downloaded, and a PyO3 build could link it.
 INTERROGATE_VERSION ?= 1.7.0
-INTERROGATE_TARGETS ?= tests
+INTERROGATE_TARGETS ?= scripts tests
 # Level 2 prints a MISSED row per undocumented definition, which the
 # `interrogate` target fails on: the rounded percentage alone passes a lone gap.
 INTERROGATE_FLAGS ?= -vv --fail-under 100
-INTERROGATE = $(UV_ENV) $(UV) tool run \
-	--from 'interrogate==$(INTERROGATE_VERSION)' interrogate
+INTERROGATE = $(UV_GATE) tool \
+	--from 'interrogate==$(INTERROGATE_VERSION)' -- interrogate
 
 # Interrogate rounds its percentage to one decimal, so `--fail-under 100` alone
 # passes a lone gap in a large repository; fail on any MISSED row as well.
