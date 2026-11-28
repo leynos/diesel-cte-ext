@@ -86,13 +86,16 @@ syntax. The backend gate therefore returns a query-builder error when
 
 ## Python docstring coverage
 
-`make lint` first runs `make interrogate`. The target needs `uv` and runs
-interrogate 1.7.0 through `uv tool run` at `--fail-under 100` with `-vv` over
-`tests` (add a new Python directory to `INTERROGATE_TARGETS` in the
-`Makefile`). It fails on any undocumented definition and on any `MISSED` row,
-because interrogate rounds its percentage to one decimal.
-`tests/workflow_contracts/interrogate_gate_test.py` asserts the wiring and runs
-the target against a stub tool.
+`make lint` first runs `make interrogate`. The target needs `uv` and `python3`
+3.9 or newer and runs interrogate 1.7.0 through the vendored
+`scripts/uv_gate.py` helper (offline first, with no `UV` override) at
+`--fail-under 100` with `-vv` over `scripts` and `tests` (add a new Python
+directory to `INTERROGATE_TARGETS` in the `Makefile`). A `uv` that reports only
+`Git operation failed` for a source missing from the cache is not retried
+online: warm the cache once with `uv tool run`. It fails on any undocumented
+definition and on any `MISSED` row, because interrogate rounds its percentage
+to one decimal. `tests/workflow_contracts/interrogate_gate_test.py` asserts the
+wiring and runs the target against a stub tool.
 
 ## Mutation testing
 
@@ -142,8 +145,9 @@ this repository does not set.
 PyYAML and pins the shape it must uphold, failing the pull request when the
 caller drifts rather than letting the breakage surface only in a scheduled run.
 Run it locally with `make test-workflow-contracts` (this wraps
-`uv run --with 'pytest>=8' --with 'pyyaml>=6' pytest tests/workflow_contracts -q`).
-The test validates:
+`$(UV_GATE) tool --python 3.13 --from 'pytest==9.2.0' --with 'pyyaml==6.0.3' --
+pytest tests/workflow_contracts -q`,
+through the vendored helper). The test validates:
 
 - job permissions are exactly least-privilege (`contents: read`,
   `id-token: write`), and the workflow-level default token scope is empty;
