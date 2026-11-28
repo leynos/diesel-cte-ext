@@ -1,5 +1,5 @@
 .PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint \
-	nixie fetch-locked prepare-pg-worker spelling \
+	nixie fetch-locked prepare-pg-worker prepare-nested-builds spelling \
 	test-prepare-pg-worker test-workflow-contracts interrogate
 
 
@@ -89,14 +89,16 @@ clean: ## Remove build artifacts
 fetch-locked: ## Fetch the locked dependencies once, before anything builds
 	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 
-test: prepare-pg-worker ## Run tests with warnings treated as errors
-	mkdir -p "$(PG_EMBED_BASE)"
-	chmod 1777 "$(PG_EMBED_BASE)"
-	# Pay for the nested builds before the timed run: build the test binaries
-	# under the run's own flags, then run the trybuild binary once, because a plain
-	# `--no-run` leaves trybuild's own build tree (<target>/tests/trybuild) empty.
+prepare-nested-builds: ## Pay for trybuild's nested builds before the timed run
+	# Build the test binaries under the run's own flags, then run the trybuild
+	# binary once, because a plain `--no-run` leaves trybuild's own build tree
+	# (<target>/tests/trybuild) empty.
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --no-run --all-targets $(WARM_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --test trybuild $(WARM_FLAGS) $(BUILD_JOBS)
+
+test: prepare-pg-worker prepare-nested-builds ## Run tests with warnings treated as errors
+	mkdir -p "$(PG_EMBED_BASE)"
+	chmod 1777 "$(PG_EMBED_BASE)"
 	PG_EMBEDDED_WORKER="$(PG_WORKER_PATH)" PG_RUNTIME_DIR="$(PG_RUNTIME_DIR)" PG_DATA_DIR="$(PG_DATA_DIR)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
 
 prepare-pg-worker: fetch-locked ## Build the locked pg_worker helper used by PostgreSQL tests
